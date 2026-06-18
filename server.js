@@ -88,20 +88,59 @@ app.get("/", requireSession, (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
-// ── API: Orders ──
+// ── API: Orders (GraphQL — no protected customer data) ──
 app.get("/api/orders", async (req, res) => {
   const shop = req.query.shop;
   const sessionId = shopify.session.getOfflineId(shop);
   const session = await shopify.config.sessionStorage.loadSession(sessionId);
   if (!session) return res.status(401).json({ error: "Not authenticated" });
   try {
-    const client = new shopify.clients.Rest({ session });
-    const response = await client.get({
-      path: "orders",
-      query: { status: "any", limit: 50, fields: "id,name,created_at,financial_status,fulfillment_status,line_items,total_price,tags" },
-    });
-    res.json(response.body.orders || []);
+    const client = new shopify.clients.Graphql({ session });
+    const response = await client.request(`
+      {
+        orders(first: 50, query: "status:any") {
+          edges {
+            node {
+              id
+              name
+              createdAt
+              displayFinancialStatus
+              displayFulfillmentStatus
+              totalPriceSet { shopMoney { amount } }
+              lineItems(first: 10) {
+                edges {
+                  node {
+                    id
+                    title
+                    variantTitle
+                    quantity
+                    originalUnitPriceSet { shopMoney { amount } }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    `);
+    const orders = response.data.orders.edges.map(({ node }) => ({
+      id: node.id.replace("gid://shopify/Order/", ""),
+      name: node.name,
+      created_at: node.createdAt,
+      financial_status: node.displayFinancialStatus?.toLowerCase(),
+      fulfillment_status: node.displayFulfillmentStatus?.toLowerCase(),
+      total_price: node.totalPriceSet?.shopMoney?.amount || "0",
+      line_items: node.lineItems.edges.map(({ node: li }) => ({
+        id: li.id.replace("gid://shopify/LineItem/", ""),
+        title: li.title,
+        variant_title: li.variantTitle,
+        quantity: li.quantity,
+        price: li.originalUnitPriceSet?.shopMoney?.amount || "0",
+      })),
+    }));
+    res.json(orders);
   } catch (e) {
+    console.error("Orders GraphQL error:", e);
     res.status(500).json({ error: e.message });
   }
 });
@@ -132,20 +171,40 @@ app.post("/api/returns", async (req, res) => {
   }
 });
 
-// ── API: Analytics ──
+// ── API: Analytics (GraphQL) ──
 app.get("/api/analytics", async (req, res) => {
   const shop = req.query.shop;
   const sessionId = shopify.session.getOfflineId(shop);
   const session = await shopify.config.sessionStorage.loadSession(sessionId);
   if (!session) return res.status(401).json({ error: "Not authenticated" });
   try {
-    const client = new shopify.clients.Rest({ session });
-    const since = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
-    const resp = await client.get({
-      path: "orders",
-      query: { status: "any", limit: 250, created_at_min: since, fields: "id,name,refunds,total_price,financial_status,line_items" },
-    });
-    const orders = resp.body.orders || [];
+    const client = new shopify.clients.Graphql({ session });
+    const since = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+    const response = await client.request(`
+      {
+        orders(first: 250, query: "created_at:>='${since}'") {
+          edges {
+            node {
+              id
+              displayFinancialStatus
+              refunds {
+                note
+                refundLineItems(first: 10) {
+                  edges {
+                    node {
+                      quantity
+                      subtotalSet { shopMoney { amount } }
+                      lineItem { title }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    `);
+    const orders = response.data.orders.edges.map(e => e.node);
     let totalRefunds = 0, refundAmount = 0;
     const reasonMap = {}, productMap = {};
     for (const order of orders) {
@@ -154,10 +213,10 @@ app.get("/api/analytics", async (req, res) => {
         for (const ref of order.refunds) {
           const note = ref.note || "No reason given";
           reasonMap[note] = (reasonMap[note] || 0) + 1;
-          for (const rli of ref.refund_line_items || []) {
-            const title = rli.line_item?.title || "Unknown";
-            productMap[title] = (productMap[title] || 0) + rli.quantity;
-            refundAmount += parseFloat(rli.subtotal || 0);
+          for (const rli of ref.refundLineItems?.edges || []) {
+            const title = rli.node.lineItem?.title || "Unknown";
+            productMap[title] = (productMap[title] || 0) + rli.node.quantity;
+            refundAmount += parseFloat(rli.node.subtotalSet?.shopMoney?.amount || 0);
           }
         }
       }
@@ -171,6 +230,7 @@ app.get("/api/analytics", async (req, res) => {
       topReasons: Object.entries(reasonMap).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([reason,count])=>({reason,count})),
     });
   } catch (e) {
+    console.error("Analytics error:", e);
     res.status(500).json({ error: e.message });
   }
 });
