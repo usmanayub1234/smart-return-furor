@@ -346,7 +346,7 @@
         <table class="data-table">
           <thead>
             <tr>
-              <th>Order</th><th>Customer</th><th>Date</th><th>Total</th>
+              <th>Order</th><th>Date</th><th>Total</th>
               <th>Financial</th><th>Fulfillment</th><th>Action</th>
             </tr>
           </thead>
@@ -578,7 +578,6 @@ function renderOrdersTable(orders) {
   tbody.innerHTML = orders.map(o => `
     <tr>
       <td><strong>${o.name}</strong></td>
-      <td>${o.email || '—'}</td>
       <td>${new Date(o.created_at).toLocaleDateString()}</td>
       <td>$${parseFloat(o.total_price||0).toFixed(2)}</td>
       <td>${statusBadge(o.financial_status)}</td>
@@ -594,11 +593,10 @@ function renderRecentOrders(orders) {
     return;
   }
   el.innerHTML = `<table class="data-table">
-    <thead><tr><th>Order</th><th>Customer</th><th>Date</th><th>Total</th><th>Status</th><th></th></tr></thead>
+    <thead><tr><th>Order</th><th>Date</th><th>Total</th><th>Status</th><th></th></tr></thead>
     <tbody>${orders.map(o => `
       <tr>
         <td><strong>${o.name}</strong></td>
-        <td>${o.email || '—'}</td>
         <td>${new Date(o.created_at).toLocaleDateString()}</td>
         <td>$${parseFloat(o.total_price||0).toFixed(2)}</td>
         <td>${statusBadge(o.financial_status)}</td>
@@ -611,7 +609,7 @@ function filterOrders() {
   const q = document.getElementById('order-search').value.toLowerCase();
   const st = document.getElementById('order-status-filter').value;
   const filtered = allOrders.filter(o => {
-    const matchQ = !q || o.name.toLowerCase().includes(q) || (o.email||'').toLowerCase().includes(q);
+    const matchQ = !q || o.name.toLowerCase().includes(q);
     const matchS = !st || o.financial_status === st || o.fulfillment_status === st;
     return matchQ && matchS;
   });

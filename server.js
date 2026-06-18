@@ -1,17 +1,17 @@
 import "@shopify/shopify-api/adapters/node";
 import express from "express";
-import { shopifyApi, ApiVersion, Session } from "@shopify/shopify-api";
+import { shopifyApi, ApiVersion, LogSeverity } from "@shopify/shopify-api";
 import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
-import fs from "fs";
+import crypto from "crypto";
 
 dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// --- In-memory session storage (swap for DB in production) ---
+// In-memory session store
 const sessionStorage = new Map();
 
 const shopify = shopifyApi({
@@ -22,177 +22,136 @@ const shopify = shopifyApi({
   hostScheme: "https",
   apiVersion: ApiVersion.January25,
   isEmbeddedApp: true,
+  logger: { level: LogSeverity.Debug },
   sessionStorage: {
-    storeSession: async (session) => {
-      sessionStorage.set(session.id, session);
-      return true;
-    },
+    storeSession: async (session) => { sessionStorage.set(session.id, session); return true; },
     loadSession: async (id) => sessionStorage.get(id) || undefined,
-    deleteSession: async (id) => {
-      sessionStorage.delete(id);
-      return true;
-    },
+    deleteSession: async (id) => { sessionStorage.delete(id); return true; },
   },
 });
 
 const app = express();
 app.use(express.json());
-
-// Serve static frontend files
 app.use("/static", express.static(path.join(__dirname, "public")));
 
-// ----------------------------------------------------------------
-// OAuth: Begin install
-// ----------------------------------------------------------------
+// ── Manual OAuth: Begin ──
 app.get("/auth", async (req, res) => {
-  await shopify.auth.begin({
-    shop: shopify.utils.sanitizeShop(req.query.shop, true),
-    callbackPath: "/auth/callback",
-    isOnline: false,
-    rawRequest: req,
-    rawResponse: res,
-  });
-});
-
-// ----------------------------------------------------------------
-// OAuth: Callback
-// ----------------------------------------------------------------
-app.get("/auth/callback", async (req, res) => {
   try {
-    const callbackResponse = await shopify.auth.callback({
+    const shop = shopify.utils.sanitizeShop(req.query.shop, true);
+    if (!shop) return res.status(400).send("Missing shop parameter");
+
+    await shopify.auth.begin({
+      shop,
+      callbackPath: "/auth/callback",
+      isOnline: false,
       rawRequest: req,
       rawResponse: res,
     });
-    const { session } = callbackResponse;
-    await shopify.config.sessionStorage.storeSession(session);
-
-    // Redirect into the embedded app
-    const host = req.query.host;
-    res.redirect(`/?shop=${session.shop}&host=${host}`);
   } catch (e) {
-    console.error("OAuth callback error:", e);
-    res.status(500).send("OAuth error: " + e.message);
+    console.error("Auth begin error:", e);
+    res.status(500).send("Auth error: " + e.message);
   }
 });
 
-// ----------------------------------------------------------------
-// Middleware: verify embedded session
-// ----------------------------------------------------------------
-async function ensureInstalled(req, res, next) {
-  const shop = req.query.shop;
-  if (!shop) return res.redirect("/auth?shop=" + shop);
+// ── Manual OAuth: Callback ──
+app.get("/auth/callback", async (req, res) => {
+  try {
+    const { session } = await shopify.auth.callback({
+      rawRequest: req,
+      rawResponse: res,
+    });
+    await shopify.config.sessionStorage.storeSession(session);
+    console.log("OAuth success for shop:", session.shop);
 
-  // Try to find an offline session
+    // Redirect to app root embedded in Shopify
+    const host = req.query.host;
+    res.redirect(`/?shop=${session.shop}&host=${host}`);
+  } catch (e) {
+    console.error("Auth callback error:", e);
+    res.status(500).send("OAuth callback error: " + e.message);
+  }
+});
+
+// ── Session check middleware ──
+async function requireSession(req, res, next) {
+  const shop = req.query.shop;
+  if (!shop) return res.status(400).send("Missing shop");
   const sessionId = shopify.session.getOfflineId(shop);
   const session = await shopify.config.sessionStorage.loadSession(sessionId);
   if (!session) return res.redirect(`/auth?shop=${shop}`);
-
   req.shopifySession = session;
   next();
 }
 
-// ----------------------------------------------------------------
-// App root – serve the embedded SPA
-// ----------------------------------------------------------------
-app.get("/", ensureInstalled, (req, res) => {
+// ── App root ──
+app.get("/", requireSession, (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
-// ================================================================
-// API Routes
-// ================================================================
-
-// GET /api/orders?shop=xxx  – fetch recent orders for return analysis
+// ── API: Orders ──
 app.get("/api/orders", async (req, res) => {
   const shop = req.query.shop;
-  if (!shop) return res.status(400).json({ error: "shop required" });
-
   const sessionId = shopify.session.getOfflineId(shop);
   const session = await shopify.config.sessionStorage.loadSession(sessionId);
   if (!session) return res.status(401).json({ error: "Not authenticated" });
-
   try {
     const client = new shopify.clients.Rest({ session });
     const response = await client.get({
       path: "orders",
-      query: { status: "any", limit: 50, fields: "id,name,email,created_at,financial_status,fulfillment_status,line_items,total_price,tags" },
+      query: { status: "any", limit: 50, fields: "id,name,created_at,financial_status,fulfillment_status,line_items,total_price,tags" },
     });
     res.json(response.body.orders || []);
   } catch (e) {
-    console.error("Orders fetch error:", e);
     res.status(500).json({ error: e.message });
   }
 });
 
-// POST /api/returns  – create a return / refund
+// ── API: Returns ──
 app.post("/api/returns", async (req, res) => {
   const { shop, orderId, lineItems, reason, notifyCustomer } = req.body;
-  if (!shop || !orderId) return res.status(400).json({ error: "shop and orderId required" });
-
   const sessionId = shopify.session.getOfflineId(shop);
   const session = await shopify.config.sessionStorage.loadSession(sessionId);
   if (!session) return res.status(401).json({ error: "Not authenticated" });
-
   try {
     const client = new shopify.clients.Rest({ session });
-
-    // Build refund line items
-    const refundLineItems = (lineItems || []).map((li) => ({
-      line_item_id: li.id,
-      quantity: li.quantity,
-      restock_type: "return",
-    }));
-
-    const body = {
-      refund: {
-        notify: notifyCustomer ?? true,
-        note: reason || "Customer return request",
-        shipping: { full_refund: false },
-        refund_line_items: refundLineItems,
-      },
-    };
-
     const response = await client.post({
       path: `orders/${orderId}/refunds`,
-      data: body,
+      data: {
+        refund: {
+          notify: notifyCustomer ?? true,
+          note: reason || "Customer return",
+          refund_line_items: (lineItems || []).map(li => ({
+            line_item_id: li.id, quantity: li.quantity, restock_type: "return"
+          })),
+        }
+      },
     });
     res.json(response.body.refund);
   } catch (e) {
-    console.error("Return creation error:", e);
     res.status(500).json({ error: e.message });
   }
 });
 
-// GET /api/analytics?shop=xxx  – return analytics summary
+// ── API: Analytics ──
 app.get("/api/analytics", async (req, res) => {
   const shop = req.query.shop;
-  if (!shop) return res.status(400).json({ error: "shop required" });
-
   const sessionId = shopify.session.getOfflineId(shop);
   const session = await shopify.config.sessionStorage.loadSession(sessionId);
   if (!session) return res.status(401).json({ error: "Not authenticated" });
-
   try {
     const client = new shopify.clients.Rest({ session });
-    // Fetch refunds from last 90 days
     const since = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
-    const ordersResp = await client.get({
+    const resp = await client.get({
       path: "orders",
       query: { status: "any", limit: 250, created_at_min: since, fields: "id,name,refunds,total_price,financial_status,line_items" },
     });
-    const orders = ordersResp.body.orders || [];
-
-    let totalOrders = orders.length;
-    let totalRefunds = 0;
-    let refundAmount = 0;
-    const reasonMap = {};
-    const productMap = {};
-
+    const orders = resp.body.orders || [];
+    let totalRefunds = 0, refundAmount = 0;
+    const reasonMap = {}, productMap = {};
     for (const order of orders) {
-      if (order.refunds && order.refunds.length > 0) {
+      if (order.refunds?.length) {
         totalRefunds++;
         for (const ref of order.refunds) {
-          // note as reason bucket
           const note = ref.note || "No reason given";
           reasonMap[note] = (reasonMap[note] || 0) + 1;
           for (const rli of ref.refund_line_items || []) {
@@ -203,33 +162,21 @@ app.get("/api/analytics", async (req, res) => {
         }
       }
     }
-
-    const topProducts = Object.entries(productMap)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
-      .map(([name, qty]) => ({ name, qty }));
-
-    const topReasons = Object.entries(reasonMap)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
-      .map(([reason, count]) => ({ reason, count }));
-
     res.json({
-      totalOrders,
+      totalOrders: orders.length,
       totalRefunds,
-      returnRate: totalOrders ? ((totalRefunds / totalOrders) * 100).toFixed(1) : 0,
+      returnRate: orders.length ? ((totalRefunds / orders.length) * 100).toFixed(1) : 0,
       refundAmount: refundAmount.toFixed(2),
-      topProducts,
-      topReasons,
+      topProducts: Object.entries(productMap).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([name,qty])=>({name,qty})),
+      topReasons: Object.entries(reasonMap).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([reason,count])=>({reason,count})),
     });
   } catch (e) {
-    console.error("Analytics error:", e);
     res.status(500).json({ error: e.message });
   }
 });
 
-// Health check
-app.get("/health", (_, res) => res.json({ status: "ok", ts: new Date().toISOString() }));
+// ── Health ──
+app.get("/health", (_, res) => res.json({ status: "ok" }));
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Smart Return Furor listening on port ${PORT}`));
+app.listen(PORT, () => console.log(`Smart Return Furor on port ${PORT}`));
