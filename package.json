@@ -12,10 +12,8 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
-    "@shopify/shopify-api": "^11.7.0",
     "dotenv": "^16.4.7",
     "express": "^4.21.2"
   },
-  "keywords": ["shopify", "returns", "refunds", "embedded-app"],
   "license": "MIT"
 }
