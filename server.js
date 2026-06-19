@@ -1,5 +1,5 @@
 import "@shopify/shopify-api/adapters/node";
-import { shopifyApi, ApiVersion } from "@shopify/shopify-api";
+import { shopifyApi, ApiVersion, Session } from "@shopify/shopify-api";
 import express from "express";
 import dotenv from "dotenv";
 import path from "path";
@@ -25,13 +25,13 @@ const shopify = shopifyApi({
 
 // Build a session object for the custom app token
 function getSession() {
-  const session = new shopify.session.Session({
+  const session = new Session({
     id: `offline_${SHOP}`,
     shop: SHOP,
     state: "active",
     isOnline: false,
-    accessToken: TOKEN,
   });
+  session.accessToken = TOKEN;
   return session;
 }
 
