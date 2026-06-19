@@ -139,7 +139,7 @@ app.post("/api/scan-high-risk", async (req, res) => {
   try {
     const since = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
 
-    // Fetch all orders in last 3 months with customer info
+    // Fetch all orders — NO customer PII fields, only ID
     const data = await shopifyGQL(`{
       orders(first: 250, query: "created_at:>='${since.split("T")[0]}'") {
         edges { node {
@@ -147,7 +147,7 @@ app.post("/api/scan-high-risk", async (req, res) => {
           name
           displayFinancialStatus
           createdAt
-          customer { id legacyResourceId firstName lastName email }
+          customer { legacyResourceId }
           refunds { id }
         }}
       }
@@ -165,8 +165,8 @@ app.post("/api/scan-high-risk", async (req, res) => {
       if (!customerMap[cid]) {
         customerMap[cid] = {
           customerId: cid,
-          name: `${order.customer.firstName || ""} ${order.customer.lastName || ""}`.trim(),
-          email: order.customer.email,
+          name: `Customer ${cid}`,
+          email: "",
           totalOrders: 0,
           voidedCount: 0,
           refundedCount: 0,
@@ -236,10 +236,18 @@ app.post("/api/scan-high-risk", async (req, res) => {
           }
         }
 
+        // Fetch customer name via REST (allowed for custom apps)
+        let customerName = `Customer ${cid}`;
+        try {
+          const cData = await shopifyRequest("GET", `customers/${cid}.json?fields=id,first_name,last_name`);
+          const cn = cData.customer;
+          if (cn) customerName = `${cn.first_name || ""} ${cn.last_name || ""}`.trim() || customerName;
+        } catch(_) {}
+
         results.push({
           customerId: cid,
-          name: c.name,
-          email: c.email,
+          name: customerName,
+          email: "",
           totalOrders: c.totalOrders,
           voidedCount: c.voidedCount,
           refundedCount: c.refundedCount,
