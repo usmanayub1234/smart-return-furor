@@ -525,9 +525,7 @@ function toast(msg, type = 'info') {
 }
 
 async function apiFetch(path, opts = {}) {
-  const shop = getShop();
-  const sep = path.includes('?') ? '&' : '?';
-  const res = await fetch(`${path}${sep}shop=${shop}`, opts);
+  const res = await fetch(path, opts);
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error(err.error || 'Request failed');
