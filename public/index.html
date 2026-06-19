@@ -1,935 +1,836 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Smart Return Furor</title>
-  <!-- Shopify App Bridge -->
-  <script src="https://unpkg.com/@shopify/app-bridge@3"></script>
-  <style>
-    :root {
-      --p-color-bg: #f6f6f7;
-      --p-color-bg-surface: #ffffff;
-      --p-color-bg-surface-secondary: #f1f1f1;
-      --p-color-text: #202223;
-      --p-color-text-secondary: #6d7175;
-      --p-color-border: #e1e3e5;
-      --p-color-interactive: #2c6ecb;
-      --p-color-interactive-hover: #1f5199;
-      --p-color-critical: #d82c0d;
-      --p-color-success: #008060;
-      --p-color-warning: #ffc453;
-      --p-color-warning-text: #4a3000;
-      --p-border-radius-200: 8px;
-      --p-border-radius-100: 4px;
-      --p-shadow-100: 0 1px 3px rgba(63,63,68,.15);
-      --p-shadow-200: 0 2px 8px rgba(63,63,68,.2);
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    }
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Smart Return Furor</title>
+<style>
+:root {
+  --bg:#f4f6f8;--surface:#fff;--border:#e3e7ed;--text:#1a1f36;--sub:#6b7280;
+  --blue:#2563eb;--green:#059669;--red:#dc2626;--yellow:#d97706;--purple:#7c3aed;
+  --radius:10px;--shadow:0 1px 4px rgba(0,0,0,.08);
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);font-size:14px;}
 
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+/* TOP BAR */
+.topbar{background:#1e2d5a;color:#fff;height:52px;display:flex;align-items:center;padding:0 20px;gap:12px;}
+.topbar-logo{width:28px;height:28px;background:#e84393;border-radius:6px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;}
+.topbar-title{font-weight:700;font-size:15px;}
+.topbar-store{margin-left:auto;background:rgba(255,255,255,.1);padding:4px 12px;border-radius:20px;font-size:12px;}
 
-    body {
-      background: var(--p-color-bg);
-      color: var(--p-color-text);
-      font-size: 14px;
-      line-height: 1.5;
-    }
+/* SIDEBAR */
+.layout{display:flex;min-height:calc(100vh - 52px);}
+.sidebar{width:200px;background:var(--surface);border-right:1px solid var(--border);padding:16px 0;flex-shrink:0;}
+.sidebar-label{font-size:11px;font-weight:600;color:var(--sub);padding:8px 16px 4px;text-transform:uppercase;letter-spacing:.6px;}
+.nav-item{display:flex;align-items:center;gap:8px;padding:9px 16px;cursor:pointer;color:var(--sub);font-size:13px;font-weight:500;border-left:3px solid transparent;transition:.15s;}
+.nav-item:hover{background:#f0f4ff;color:var(--text);}
+.nav-item.active{background:#eff6ff;color:var(--blue);border-left-color:var(--blue);}
+.nav-item .icon{width:16px;text-align:center;}
+.badge-count{margin-left:auto;background:var(--red);color:#fff;border-radius:10px;padding:1px 7px;font-size:11px;font-weight:700;}
 
-    /* ── Top Bar ── */
-    .top-bar {
-      background: #1a1a2e;
-      color: white;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0 24px;
-      height: 56px;
-      box-shadow: 0 1px 0 rgba(255,255,255,.1);
-    }
-    .top-bar-brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 16px; }
-    .top-bar-brand svg { width: 28px; height: 28px; }
-    .badge { background: #e84393; color: white; border-radius: 12px; padding: 2px 10px; font-size: 12px; font-weight: 600; }
+/* MAIN */
+.main{flex:1;padding:24px;overflow-x:hidden;}
+.page{display:none;}.page.active{display:block;}
+.page-title{font-size:22px;font-weight:700;margin-bottom:4px;}
+.page-sub{font-size:13px;color:var(--sub);margin-bottom:20px;}
 
-    /* ── Nav Tabs ── */
-    .nav-tabs {
-      background: var(--p-color-bg-surface);
-      border-bottom: 1px solid var(--p-color-border);
-      display: flex;
-      padding: 0 24px;
-      gap: 4px;
-    }
-    .nav-tab {
-      padding: 14px 16px;
-      cursor: pointer;
-      color: var(--p-color-text-secondary);
-      font-size: 14px;
-      font-weight: 500;
-      border-bottom: 2px solid transparent;
-      transition: all .15s;
-      white-space: nowrap;
-    }
-    .nav-tab:hover { color: var(--p-color-text); }
-    .nav-tab.active { color: var(--p-color-interactive); border-bottom-color: var(--p-color-interactive); }
+/* STAT CARDS */
+.stat-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:20px;}
+.stat-card{background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);padding:20px;box-shadow:var(--shadow);}
+.stat-label{font-size:12px;color:var(--sub);font-weight:500;margin-bottom:8px;}
+.stat-value{font-size:30px;font-weight:800;line-height:1;}
+.stat-desc{font-size:12px;color:var(--sub);margin-top:6px;}
+.stat-change{font-size:12px;font-weight:600;margin-top:4px;}
+.stat-change.up{color:var(--red);}
+.stat-change.down{color:var(--green);}
 
-    /* ── Layout ── */
-    .page-content { padding: 24px; max-width: 1200px; }
+/* CARDS */
+.card{background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);box-shadow:var(--shadow);margin-bottom:16px;}
+.card-head{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.card-title{font-size:14px;font-weight:700;}
+.card-body{padding:18px;}
 
-    .view { display: none; }
-    .view.active { display: block; }
+/* ALERT */
+.alert{border-radius:var(--radius);padding:14px 18px;margin-bottom:16px;display:flex;gap:10px;align-items:flex-start;}
+.alert.warning{background:#fffbeb;border:1px solid #fcd34d;}
+.alert.info{background:#eff6ff;border:1px solid #bfdbfe;}
+.alert-icon{font-size:18px;flex-shrink:0;}
+.alert-text strong{display:block;font-size:13px;font-weight:700;margin-bottom:2px;}
+.alert-text span{font-size:12px;color:var(--sub);}
 
-    /* ── Cards ── */
-    .card {
-      background: var(--p-color-bg-surface);
-      border-radius: var(--p-border-radius-200);
-      box-shadow: var(--p-shadow-100);
-      margin-bottom: 16px;
-    }
-    .card-header {
-      padding: 16px 20px;
-      border-bottom: 1px solid var(--p-color-border);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-    .card-title { font-size: 15px; font-weight: 600; }
-    .card-body { padding: 20px; }
+/* TABS */
+.tab-bar{display:flex;gap:4px;margin-bottom:16px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:4px;width:fit-content;}
+.tab-btn{padding:7px 16px;border-radius:6px;border:none;background:none;cursor:pointer;font-size:13px;font-weight:500;color:var(--sub);transition:.15s;}
+.tab-btn.active{background:var(--blue);color:#fff;}
+.tab-count{display:inline-block;background:rgba(0,0,0,.1);border-radius:10px;padding:0 6px;font-size:11px;margin-left:4px;}
+.tab-btn.active .tab-count{background:rgba(255,255,255,.25);}
 
-    /* ── Stat Grid ── */
-    .stat-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      gap: 16px;
-      margin-bottom: 20px;
-    }
-    .stat-card {
-      background: var(--p-color-bg-surface);
-      border-radius: var(--p-border-radius-200);
-      box-shadow: var(--p-shadow-100);
-      padding: 20px;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-    .stat-label { font-size: 12px; color: var(--p-color-text-secondary); font-weight: 500; text-transform: uppercase; letter-spacing: .5px; }
-    .stat-value { font-size: 28px; font-weight: 700; }
-    .stat-sub { font-size: 12px; color: var(--p-color-text-secondary); }
-    .stat-card.danger .stat-value { color: var(--p-color-critical); }
-    .stat-card.success .stat-value { color: var(--p-color-success); }
-    .stat-card.warning .stat-value { color: #b07800; }
+/* TABLE */
+.data-table{width:100%;border-collapse:collapse;}
+.data-table th{text-align:left;padding:10px 14px;font-size:11px;font-weight:600;color:var(--sub);text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border);white-space:nowrap;}
+.data-table td{padding:13px 14px;border-bottom:1px solid var(--border);font-size:13px;vertical-align:middle;}
+.data-table tr:last-child td{border-bottom:none;}
+.data-table tr:hover td{background:#f9fafb;}
 
-    /* ── Table ── */
-    .data-table { width: 100%; border-collapse: collapse; }
-    .data-table th {
-      text-align: left; padding: 10px 12px;
-      font-size: 12px; font-weight: 600;
-      color: var(--p-color-text-secondary);
-      text-transform: uppercase; letter-spacing: .5px;
-      border-bottom: 1px solid var(--p-color-border);
-    }
-    .data-table td { padding: 12px; border-bottom: 1px solid var(--p-color-border); font-size: 14px; }
-    .data-table tr:last-child td { border-bottom: none; }
-    .data-table tr:hover td { background: var(--p-color-bg-surface-secondary); }
+/* RISK BADGES */
+.risk{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:700;}
+.risk.high{background:#fef2f2;color:var(--red);}
+.risk.medium{background:#fffbeb;color:var(--yellow);}
+.risk.low{background:#f0fdf4;color:var(--green);}
+.flag-chip{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;margin:2px;}
+.flag-chip.cancel{background:#fef2f2;color:var(--red);}
+.flag-chip.stores{background:#eff6ff;color:var(--blue);}
+.flag-chip.return{background:#faf5ff;color:var(--purple);}
 
-    /* ── Status badges ── */
-    .status-badge {
-      display: inline-block;
-      padding: 2px 10px;
-      border-radius: 12px;
-      font-size: 12px;
-      font-weight: 600;
-    }
-    .status-badge.refunded { background: #fce8e6; color: var(--p-color-critical); }
-    .status-badge.fulfilled { background: #e3f1df; color: var(--p-color-success); }
-    .status-badge.pending { background: #fff3cd; color: var(--p-color-warning-text); }
-    .status-badge.partial { background: #e5e5ff; color: #4b44b0; }
-    .status-badge.unfulfilled { background: #f0f0f0; color: var(--p-color-text-secondary); }
+/* STATUS */
+.status{display:inline-block;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:600;}
+.status.paid{background:#f0fdf4;color:var(--green);}
+.status.pending{background:#fffbeb;color:var(--yellow);}
+.status.voided{background:#f9fafb;color:var(--sub);}
+.status.refunded{background:#fef2f2;color:var(--red);}
+.status.cancelled{background:#f9fafb;color:var(--sub);}
 
-    /* ── Buttons ── */
-    .btn {
-      display: inline-flex; align-items: center; gap: 6px;
-      padding: 8px 16px; border-radius: var(--p-border-radius-100);
-      font-size: 14px; font-weight: 500; cursor: pointer;
-      border: 1px solid transparent; transition: all .15s;
-      white-space: nowrap;
-    }
-    .btn-primary { background: var(--p-color-interactive); color: white; border-color: var(--p-color-interactive); }
-    .btn-primary:hover { background: var(--p-color-interactive-hover); }
-    .btn-secondary { background: white; color: var(--p-color-text); border-color: var(--p-color-border); }
-    .btn-secondary:hover { background: var(--p-color-bg); }
-    .btn-critical { background: var(--p-color-critical); color: white; }
-    .btn-critical:hover { background: #b52308; }
-    .btn-sm { padding: 5px 12px; font-size: 13px; }
-    button:disabled { opacity: .5; cursor: not-allowed; }
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:7px;border:1px solid transparent;font-size:13px;font-weight:600;cursor:pointer;transition:.15s;}
+.btn-primary{background:var(--blue);color:#fff;border-color:var(--blue);}
+.btn-primary:hover{background:#1d4ed8;}
+.btn-outline{background:#fff;color:var(--text);border-color:var(--border);}
+.btn-outline:hover{background:#f9fafb;}
+.btn-sm{padding:5px 12px;font-size:12px;}
+button:disabled{opacity:.5;cursor:not-allowed;}
 
-    /* ── Form ── */
-    .form-group { margin-bottom: 16px; }
-    .form-label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
-    .form-control {
-      width: 100%; padding: 8px 12px;
-      border: 1px solid var(--p-color-border);
-      border-radius: var(--p-border-radius-100);
-      font-size: 14px; background: white;
-      transition: border-color .15s;
-    }
-    .form-control:focus { outline: none; border-color: var(--p-color-interactive); box-shadow: 0 0 0 2px rgba(44,110,203,.2); }
-    select.form-control { cursor: pointer; }
+/* OFFENDER ROW */
+.offender-row{display:flex;align-items:center;gap:14px;padding:14px 0;border-bottom:1px solid var(--border);}
+.offender-row:last-child{border-bottom:none;}
+.offender-avatar{width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#6366f1,#ec4899);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:14px;flex-shrink:0;}
+.offender-info{flex:1;}
+.offender-name{font-weight:600;font-size:13px;}
+.offender-meta{font-size:12px;color:var(--sub);margin-top:2px;}
+.offender-stats{text-align:right;}
+.offender-val{font-weight:700;font-size:13px;}
+.offender-sub{font-size:11px;color:var(--sub);}
 
-    /* ── Return Modal ── */
-    .modal-overlay {
-      display: none; position: fixed; inset: 0;
-      background: rgba(0,0,0,.5); z-index: 1000;
-      align-items: center; justify-content: center;
-    }
-    .modal-overlay.open { display: flex; }
-    .modal {
-      background: white; border-radius: var(--p-border-radius-200);
-      box-shadow: var(--p-shadow-200); width: 560px; max-width: 95vw;
-      max-height: 90vh; overflow-y: auto;
-    }
-    .modal-header {
-      padding: 16px 20px; border-bottom: 1px solid var(--p-color-border);
-      display: flex; align-items: center; justify-content: space-between;
-    }
-    .modal-title { font-size: 16px; font-weight: 700; }
-    .modal-close { background: none; border: none; font-size: 20px; cursor: pointer; color: var(--p-color-text-secondary); line-height: 1; }
-    .modal-body { padding: 20px; }
-    .modal-footer { padding: 16px 20px; border-top: 1px solid var(--p-color-border); display: flex; justify-content: flex-end; gap: 8px; }
+/* PROGRESS */
+.prog-wrap{background:#e5e7eb;border-radius:4px;height:6px;overflow:hidden;margin-top:4px;}
+.prog-fill{height:100%;border-radius:4px;background:var(--red);}
+.prog-fill.yellow{background:var(--yellow);}
+.prog-fill.blue{background:var(--blue);}
 
-    /* ── Line Item Checklist ── */
-    .line-item-row {
-      display: flex; align-items: center; gap: 12px;
-      padding: 10px 0; border-bottom: 1px solid var(--p-color-border);
-    }
-    .line-item-row:last-child { border-bottom: none; }
-    .line-item-row input[type=checkbox] { width: 16px; height: 16px; cursor: pointer; }
-    .line-item-info { flex: 1; }
-    .line-item-title { font-weight: 500; }
-    .line-item-meta { font-size: 12px; color: var(--p-color-text-secondary); }
-    .qty-input { width: 60px; padding: 4px 8px; border: 1px solid var(--p-color-border); border-radius: 4px; text-align: center; }
+/* GRID */
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+@media(max-width:900px){.two-col{grid-template-columns:1fr;}}
 
-    /* ── Progress Bar ── */
-    .progress-bar-wrap { background: #e8e8e8; border-radius: 4px; height: 6px; overflow: hidden; }
-    .progress-bar-fill { height: 100%; border-radius: 4px; background: var(--p-color-interactive); transition: width .4s; }
+/* SPINNER / EMPTY */
+.spinner{display:inline-block;width:18px;height:18px;border:2px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.empty{text-align:center;padding:50px 20px;color:var(--sub);}
+.empty-icon{font-size:40px;margin-bottom:12px;}
+.empty h3{font-size:16px;font-weight:600;color:var(--text);margin-bottom:6px;}
 
-    /* ── Search / Filter Bar ── */
-    .filter-bar { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
-    .filter-bar .form-control { max-width: 240px; }
+/* TOAST */
+#toasts{position:fixed;bottom:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:8px;}
+.toast{padding:12px 18px;border-radius:8px;color:#fff;font-size:13px;font-weight:500;min-width:240px;animation:toastIn .2s ease;}
+.toast.success{background:var(--green);}
+.toast.error{background:var(--red);}
+.toast.info{background:var(--blue);}
+@keyframes toastIn{from{transform:translateX(30px);opacity:0;}to{transform:none;opacity:1;}}
 
-    /* ── Empty & loading states ── */
-    .empty-state { text-align: center; padding: 60px 20px; color: var(--p-color-text-secondary); }
-    .empty-state svg { width: 64px; height: 64px; margin: 0 auto 16px; opacity: .4; }
-    .empty-state h3 { font-size: 18px; margin-bottom: 8px; color: var(--p-color-text); }
-    .spinner { display: inline-block; width: 20px; height: 20px; border: 2px solid var(--p-color-border); border-top-color: var(--p-color-interactive); border-radius: 50%; animation: spin .7s linear infinite; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-
-    /* ── Toast ── */
-    #toast-container { position: fixed; bottom: 24px; right: 24px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; }
-    .toast {
-      background: #1a1a2e; color: white;
-      padding: 12px 20px; border-radius: var(--p-border-radius-100);
-      box-shadow: var(--p-shadow-200); font-size: 14px;
-      animation: slideIn .2s ease; min-width: 260px;
-    }
-    .toast.success { background: var(--p-color-success); }
-    .toast.error { background: var(--p-color-critical); }
-    @keyframes slideIn { from { transform: translateX(40px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-
-    /* ── Chart ── */
-    .chart-wrap { position: relative; height: 180px; overflow: hidden; }
-    .bar-chart { display: flex; align-items: flex-end; gap: 8px; height: 100%; padding: 0 4px; }
-    .bar-col { display: flex; flex-direction: column; align-items: center; gap: 4px; flex: 1; }
-    .bar-col .bar { width: 100%; background: var(--p-color-interactive); border-radius: 4px 4px 0 0; transition: height .5s; opacity: .85; }
-    .bar-col .bar-label { font-size: 10px; color: var(--p-color-text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 60px; text-align: center; }
-    .bar-col .bar-val { font-size: 11px; font-weight: 600; }
-
-    /* ── Reason chip list ── */
-    .reason-list { display: flex; flex-direction: column; gap: 8px; }
-    .reason-item { display: flex; align-items: center; gap: 10px; }
-    .reason-label { flex: 0 0 160px; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .reason-bar-wrap { flex: 1; background: #eee; border-radius: 4px; height: 8px; }
-    .reason-bar { height: 8px; border-radius: 4px; background: #e84393; }
-    .reason-count { font-size: 12px; font-weight: 600; color: var(--p-color-text-secondary); min-width: 24px; text-align: right; }
-
-    /* ── Rules builder ── */
-    .rule-row { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
-    .rule-row .form-control { flex: 1; }
-    .btn-icon { background: none; border: none; cursor: pointer; padding: 6px; color: var(--p-color-critical); font-size: 18px; }
-
-    /* ── Setup callout ── */
-    .callout {
-      background: #f0f7ff; border: 1px solid #b0ccf7;
-      border-radius: var(--p-border-radius-200); padding: 16px 20px;
-      margin-bottom: 20px;
-    }
-    .callout h3 { font-size: 15px; margin-bottom: 6px; color: var(--p-color-interactive); }
-    .callout p { font-size: 13px; color: #444; }
-    .callout code { background: #dce8fb; padding: 1px 6px; border-radius: 3px; font-family: monospace; }
-  </style>
+/* MODAL */
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;align-items:center;justify-content:center;}
+.overlay.open{display:flex;}
+.modal{background:#fff;border-radius:12px;width:520px;max-width:95vw;max-height:90vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.2);}
+.modal-head{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.modal-title{font-size:16px;font-weight:700;}
+.modal-close{background:none;border:none;font-size:22px;cursor:pointer;color:var(--sub);line-height:1;}
+.modal-body{padding:20px;}
+.modal-foot{padding:14px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px;}
+.form-group{margin-bottom:14px;}
+.form-label{display:block;font-size:12px;font-weight:600;margin-bottom:5px;color:var(--sub);}
+.form-control{width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:7px;font-size:13px;}
+.form-control:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(37,99,235,.1);}
+.li-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);}
+.li-row:last-child{border-bottom:none;}
+.li-title{font-weight:500;flex:1;}
+.li-price{font-size:12px;color:var(--sub);}
+.qty-inp{width:56px;padding:4px 8px;border:1px solid var(--border);border-radius:5px;text-align:center;}
+</style>
 </head>
 <body>
 
 <!-- TOP BAR -->
-<div class="top-bar">
-  <div class="top-bar-brand">
-    <svg viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <circle cx="14" cy="14" r="14" fill="#e84393"/>
-      <path d="M8 18l4-8 3 5 2-3 3 6" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-    </svg>
-    Smart Return Furor
-  </div>
-  <span class="badge">Beta</span>
+<div class="topbar">
+  <div class="topbar-logo">SRF</div>
+  <div class="topbar-title">Smart Return Furor</div>
+  <div class="topbar-store" id="store-name">Loading...</div>
 </div>
 
-<!-- NAV TABS -->
-<div class="nav-tabs">
-  <div class="nav-tab active" data-view="dashboard">Dashboard</div>
-  <div class="nav-tab" data-view="orders">Orders & Returns</div>
-  <div class="nav-tab" data-view="analytics">Analytics</div>
-  <div class="nav-tab" data-view="highrisk">⚠️ High Risk</div>
-  <div class="nav-tab" data-view="rules">Return Rules</div>
-  <div class="nav-tab" data-view="setup">Setup Guide</div>
+<div class="layout">
+<!-- SIDEBAR -->
+<div class="sidebar">
+  <div class="sidebar-label">Main</div>
+  <div class="nav-item active" data-page="dashboard"><span class="icon">📊</span> Dashboard</div>
+  <div class="nav-item" data-page="flagged"><span class="icon">🚨</span> Flagged Orders <span class="badge-count" id="flag-count">0</span></div>
+  <div class="nav-item" data-page="customers"><span class="icon">👥</span> Customers</div>
+  <div class="nav-item" data-page="orders"><span class="icon">📦</span> All Orders</div>
+  <div class="sidebar-label" style="margin-top:8px">Analytics</div>
+  <div class="nav-item" data-page="analytics"><span class="icon">📈</span> Analytics</div>
+  <div class="nav-item" data-page="returns"><span class="icon">↩️</span> Returns</div>
+  <div class="sidebar-label" style="margin-top:8px">Settings</div>
+  <div class="nav-item" data-page="rules"><span class="icon">⚙️</span> Risk Rules</div>
 </div>
 
-<!-- VIEWS -->
-<div class="page-content">
+<!-- MAIN -->
+<div class="main">
 
-  <!-- ── DASHBOARD ── -->
-  <div id="view-dashboard" class="view active">
-    <div class="stat-grid" id="dash-stats">
-      <div class="stat-card"><div class="stat-label">Total Orders (90d)</div><div class="stat-value" id="s-orders"><span class="spinner"></span></div><div class="stat-sub">Last 90 days</div></div>
-      <div class="stat-card danger"><div class="stat-label">Returns Filed</div><div class="stat-value" id="s-returns">—</div><div class="stat-sub">With refunds</div></div>
-      <div class="stat-card warning"><div class="stat-label">Return Rate</div><div class="stat-value" id="s-rate">—</div><div class="stat-sub">% of orders</div></div>
-      <div class="stat-card success"><div class="stat-label">Refund Amount</div><div class="stat-value" id="s-amount">—</div><div class="stat-sub">Total refunded</div></div>
+<!-- DASHBOARD -->
+<div id="page-dashboard" class="page active">
+  <div class="page-title">Performance Overview</div>
+  <div class="page-sub" id="dash-sub">Tracking risk metrics for your store</div>
+
+  <!-- Webhook status -->
+  <div id="webhook-status" class="alert info" style="margin-bottom:16px">
+    <div class="alert-icon">🔗</div>
+    <div class="alert-text">
+      <strong id="wh-title">Checking auto-tag webhook...</strong>
+      <span id="wh-body">Verifying real-time order monitoring is active</span>
     </div>
+  </div>
 
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;flex-wrap:wrap">
-      <div class="card">
-        <div class="card-header"><span class="card-title">Top Returned Products</span></div>
-        <div class="card-body" id="top-products-chart">
-          <div class="empty-state" style="padding:30px 0"><span class="spinner"></span></div>
-        </div>
+  <div class="stat-row">
+    <div class="stat-card">
+      <div class="stat-label">Total Analyzed</div>
+      <div class="stat-value" id="d-total">—</div>
+      <div class="stat-desc">Orders last 90 days</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Total Returns</div>
+      <div class="stat-value" style="color:var(--red)" id="d-returns">—</div>
+      <div class="stat-desc">Refunded orders</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Return Rate</div>
+      <div class="stat-value" style="color:var(--yellow)" id="d-rate">—</div>
+      <div class="stat-desc">% of total orders</div>
+      <div class="stat-change up" id="d-rate-change"></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Estimated Loss</div>
+      <div class="stat-value" style="color:var(--red)" id="d-loss">—</div>
+      <div class="stat-desc">Total refunded value</div>
+    </div>
+  </div>
+
+  <!-- Performance insight -->
+  <div class="alert info" id="perf-insight" style="display:none">
+    <div class="alert-icon">ℹ️</div>
+    <div class="alert-text">
+      <strong id="insight-title">Performance Insight</strong>
+      <span id="insight-body"></span>
+    </div>
+  </div>
+
+  <div class="two-col">
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title">Repeat Offender Spotlight</span>
+        <button class="btn btn-outline btn-sm" onclick="navTo('customers')">View All</button>
       </div>
-      <div class="card">
-        <div class="card-header"><span class="card-title">Return Reasons</span></div>
-        <div class="card-body" id="top-reasons-chart">
-          <div class="empty-state" style="padding:30px 0"><span class="spinner"></span></div>
-        </div>
+      <div class="card-body" id="offender-list">
+        <div class="empty"><span class="spinner"></span></div>
       </div>
     </div>
-
-    <div class="card" style="margin-top:16px">
-      <div class="card-header">
-        <span class="card-title">Recent Orders Requiring Attention</span>
-        <button class="btn btn-secondary btn-sm" onclick="loadOrders()">↻ Refresh</button>
-      </div>
-      <div class="card-body" style="padding:0" id="recent-orders-table">
-        <div class="empty-state" style="padding:40px 0"><span class="spinner"></span></div>
+    <div class="card">
+      <div class="card-head"><span class="card-title">Return Reasons</span></div>
+      <div class="card-body" id="dash-reasons">
+        <div class="empty"><span class="spinner"></span></div>
       </div>
     </div>
   </div>
 
-  <!-- ── ORDERS & RETURNS ── -->
-  <div id="view-orders" class="view">
-    <div class="filter-bar">
-      <input class="form-control" id="order-search" placeholder="Search by order # or email…" oninput="filterOrders()">
-      <select class="form-control" id="order-status-filter" onchange="filterOrders()" style="max-width:180px">
-        <option value="">All statuses</option>
-        <option value="refunded">Refunded</option>
-        <option value="fulfilled">Fulfilled</option>
-        <option value="unfulfilled">Unfulfilled</option>
-        <option value="partial">Partial</option>
-      </select>
-      <button class="btn btn-primary btn-sm" onclick="loadOrders()">↻ Reload</button>
+  <div class="card">
+    <div class="card-head">
+      <span class="card-title">Recent Flagged Orders</span>
+      <button class="btn btn-outline btn-sm" onclick="navTo('flagged')">View All Flagged</button>
     </div>
-    <div class="card">
-      <div style="overflow-x:auto">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Order</th><th>Date</th><th>Total</th>
-              <th>Financial</th><th>Fulfillment</th><th>Action</th>
-            </tr>
-          </thead>
-          <tbody id="orders-tbody">
-            <tr><td colspan="7"><div class="empty-state" style="padding:40px 0"><span class="spinner"></span></div></td></tr>
-          </tbody>
-        </table>
-      </div>
+    <div style="overflow-x:auto">
+      <table class="data-table">
+        <thead><tr><th>Order</th><th>Customer</th><th>Value</th><th>Status</th><th>Risk</th><th>Flags</th></tr></thead>
+        <tbody id="dash-orders"><tr><td colspan="6"><div class="empty"><span class="spinner"></span></div></td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- FLAGGED ORDERS -->
+<div id="page-flagged" class="page">
+  <div class="page-title">Flagged Orders</div>
+  <div class="page-sub">Orders identified as risky based on customer history</div>
+
+  <div class="stat-row" style="grid-template-columns:repeat(3,1fr)">
+    <div class="stat-card"><div class="stat-label">Risky Customers</div><div class="stat-value" style="color:var(--red)" id="f-risky">—</div><div class="stat-desc">Orders from High/Medium risk profiles</div></div>
+    <div class="stat-card"><div class="stat-label">Cancelled / Returned</div><div class="stat-value" style="color:var(--yellow)" id="f-cancelled">—</div><div class="stat-desc">Orders lost to cancellation or RTO</div></div>
+    <div class="stat-card"><div class="stat-label">High Risk</div><div class="stat-value" style="color:var(--red)" id="f-high">—</div><div class="stat-desc">Customers with 2+ bad orders</div></div>
+  </div>
+
+  <div class="alert warning" id="scan-alert" style="display:none">
+    <div class="alert-icon">⚠️</div>
+    <div class="alert-text">
+      <strong>Scan Required</strong>
+      <span>Run a scan to detect risky customers and tag orders automatically.</span>
     </div>
   </div>
 
-  <!-- ── ANALYTICS ── -->
-  <div id="view-analytics" class="view">
-    <div class="callout">
-      <h3>📊 90-Day Return Analytics</h3>
-      <p>Data is fetched live from your Shopify store. It covers all orders with refunds in the last 90 days.</p>
-    </div>
-    <div class="stat-grid">
-      <div class="stat-card"><div class="stat-label">Total Orders</div><div class="stat-value" id="a-orders">—</div></div>
-      <div class="stat-card danger"><div class="stat-label">Orders w/ Returns</div><div class="stat-value" id="a-returns">—</div></div>
-      <div class="stat-card warning"><div class="stat-label">Return Rate</div><div class="stat-value" id="a-rate">—</div></div>
-      <div class="stat-card success"><div class="stat-label">$ Refunded</div><div class="stat-value" id="a-amount">—</div></div>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
-      <div class="card">
-        <div class="card-header"><span class="card-title">Most Returned Products</span></div>
-        <div class="card-body" id="analytics-products">
-          <div class="empty-state" style="padding:20px 0"><span class="spinner"></span></div>
-        </div>
+  <div class="card">
+    <div class="card-head">
+      <div class="tab-bar">
+        <button class="tab-btn active" data-filter="all">All Flagged <span class="tab-count" id="tab-all">0</span></button>
+        <button class="tab-btn" data-filter="high">Risky <span class="tab-count" id="tab-high">0</span></button>
+        <button class="tab-btn" data-filter="cancelled">Cancelled/Returned <span class="tab-count" id="tab-cancel">0</span></button>
       </div>
-      <div class="card">
-        <div class="card-header"><span class="card-title">Return Reason Breakdown</span></div>
-        <div class="card-body" id="analytics-reasons">
-          <div class="empty-state" style="padding:20px 0"><span class="spinner"></span></div>
-        </div>
+      <button class="btn btn-primary btn-sm" id="scan-btn" onclick="runScan()">🔍 Scan & Tag</button>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="data-table">
+        <thead><tr><th>Order</th><th>Date</th><th>Customer</th><th>Value</th><th>Payment</th><th>Fulfillment</th><th>Risk</th><th>Flags</th><th></th></tr></thead>
+        <tbody id="flagged-tbody"><tr><td colspan="9"><div class="empty"><div class="empty-icon">🔍</div><h3>Run a scan first</h3><p>Click "Scan & Tag" to detect risky orders</p></div></td></tr></tbody>
+      </table>
+    </div>
+    <div id="scan-progress" style="display:none;padding:16px 18px;border-top:1px solid var(--border);font-size:13px;color:var(--sub)"></div>
+  </div>
+</div>
+
+<!-- CUSTOMERS -->
+<div id="page-customers" class="page">
+  <div class="page-title">Risky Customers</div>
+  <div class="page-sub">Customers tagged as high-risk or medium-risk based on 90-day order history</div>
+  <div class="card">
+    <div class="card-head">
+      <span class="card-title">Customer Risk List</span>
+      <button class="btn btn-outline btn-sm" onclick="loadRiskyCustomers()">↻ Refresh</button>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="data-table">
+        <thead><tr><th>Customer</th><th>Email</th><th>Orders</th><th>Total Spent</th><th>Voided</th><th>Returned</th><th>Cancel %</th><th>Risk Profile</th><th>Status</th></tr></thead>
+        <tbody id="customers-tbody"><tr><td colspan="9"><div class="empty"><span class="spinner"></span></div></td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ALL ORDERS -->
+<div id="page-orders" class="page">
+  <div class="page-title">All Orders</div>
+  <div class="page-sub">Complete order list with risk indicators</div>
+  <div style="display:flex;gap:10px;margin-bottom:14px">
+    <input class="form-control" style="max-width:240px" id="order-search" placeholder="Search order #..." oninput="filterOrders()">
+    <select class="form-control" style="max-width:160px" id="order-filter" onchange="filterOrders()">
+      <option value="">All statuses</option>
+      <option value="paid">Paid</option>
+      <option value="refunded">Refunded</option>
+      <option value="voided">Voided</option>
+      <option value="pending">Pending</option>
+    </select>
+    <button class="btn btn-outline btn-sm" onclick="loadOrders()">↻ Reload</button>
+  </div>
+  <div class="card">
+    <div style="overflow-x:auto">
+      <table class="data-table">
+        <thead><tr><th>Order</th><th>Date</th><th>Total</th><th>Payment</th><th>Fulfillment</th><th>Risk</th><th>Action</th></tr></thead>
+        <tbody id="orders-tbody"><tr><td colspan="7"><div class="empty"><span class="spinner"></span></div></td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ANALYTICS -->
+<div id="page-analytics" class="page">
+  <div class="page-title">Analytics</div>
+  <div class="page-sub">90-day return and risk performance metrics</div>
+  <div class="stat-row">
+    <div class="stat-card"><div class="stat-label">Total Orders</div><div class="stat-value" id="a-orders">—</div></div>
+    <div class="stat-card"><div class="stat-label">Returns Filed</div><div class="stat-value" style="color:var(--red)" id="a-returns">—</div></div>
+    <div class="stat-card"><div class="stat-label">Return Rate</div><div class="stat-value" style="color:var(--yellow)" id="a-rate">—</div></div>
+    <div class="stat-card"><div class="stat-label">$ Refunded</div><div class="stat-value" style="color:var(--red)" id="a-amount">—</div></div>
+  </div>
+  <div class="two-col">
+    <div class="card">
+      <div class="card-head"><span class="card-title">Most Returned Products</span></div>
+      <div class="card-body" id="a-products"><div class="empty"><span class="spinner"></span></div></div>
+    </div>
+    <div class="card">
+      <div class="card-head"><span class="card-title">Return Reason Breakdown</span></div>
+      <div class="card-body" id="a-reasons"><div class="empty"><span class="spinner"></span></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- RETURNS -->
+<div id="page-returns" class="page">
+  <div class="page-title">Create Return</div>
+  <div class="page-sub">Select an order from All Orders to initiate a return</div>
+  <div class="card">
+    <div class="card-body">
+      <div class="empty">
+        <div class="empty-icon">↩️</div>
+        <h3>Select an order</h3>
+        <p>Go to <strong>All Orders</strong> and click the Return button on any order</p>
+        <button class="btn btn-primary" style="margin-top:16px" onclick="navTo('orders')">Go to Orders</button>
       </div>
     </div>
   </div>
+</div>
 
-  <!-- ── RETURN RULES ── -->
-  <div id="view-rules" class="view">
-    <div class="callout">
-      <h3>⚙️ Return Policy Rules</h3>
-      <p>Define automated rules for return eligibility. Rules are evaluated top-to-bottom. (These are stored locally in the app — integrate with your webhook handler to enforce them at the API level.)</p>
-    </div>
-    <div class="card">
-      <div class="card-header">
-        <span class="card-title">Active Rules</span>
-        <button class="btn btn-primary btn-sm" onclick="addRule()">+ Add Rule</button>
+<!-- RISK RULES -->
+<div id="page-rules" class="page">
+  <div class="page-title">Risk Rules</div>
+  <div class="page-sub">Configure thresholds for automatic risk classification</div>
+  <div class="card">
+    <div class="card-head"><span class="card-title">Risk Thresholds</span></div>
+    <div class="card-body">
+      <div class="form-group">
+        <label class="form-label">HIGH RISK threshold — flag customer after this many bad orders in 90 days</label>
+        <input type="number" class="form-control" id="rule-high" value="2" min="1" max="10" style="max-width:100px">
       </div>
-      <div class="card-body" id="rules-container">
-        <!-- rules rendered by JS -->
+      <div class="form-group">
+        <label class="form-label">MEDIUM RISK threshold — flag customer after this many bad orders in 90 days</label>
+        <input type="number" class="form-control" id="rule-medium" value="1" min="1" max="10" style="max-width:100px">
       </div>
-      <div class="card-body" style="border-top:1px solid var(--p-color-border);padding-top:16px">
-        <button class="btn btn-primary" onclick="saveRules()">💾 Save Rules</button>
+      <div class="form-group">
+        <label class="form-label">Order tag for HIGH RISK new orders</label>
+        <input type="text" class="form-control" id="rule-tag-high" value="Smart Returns - High Risk Order" style="max-width:360px">
       </div>
-    </div>
-  </div>
-
-  <!-- ── SETUP GUIDE ── -->
-  <div id="view-setup" class="view">
-    <div class="callout">
-      <h3>🚀 Deploy Smart Return Furor to Railway</h3>
-      <p>Follow these steps to permanently host your app so it works in Shopify Admin at all times.</p>
-    </div>
-
-    <div class="card">
-      <div class="card-header"><span class="card-title">Step 1 — Create a Shopify App in Partners</span></div>
-      <div class="card-body">
-        <ol style="padding-left:18px;line-height:2">
-          <li>Go to <strong>partners.shopify.com</strong> → Apps → Create app (Custom app)</li>
-          <li>Name it <strong>Smart Return Furor</strong></li>
-          <li>Copy the <strong>API key</strong> and <strong>API secret</strong></li>
-        </ol>
+      <div class="form-group">
+        <label class="form-label">Order tag for MEDIUM RISK new orders</label>
+        <input type="text" class="form-control" id="rule-tag-medium" value="Smart Returns - Medium Risk Order" style="max-width:360px">
       </div>
-    </div>
-
-    <div class="card">
-      <div class="card-header"><span class="card-title">Step 2 — Deploy to Railway</span></div>
-      <div class="card-body">
-        <ol style="padding-left:18px;line-height:2.2">
-          <li>Go to <strong>railway.app</strong> → New Project → Deploy from GitHub repo</li>
-          <li>Push the generated app folder to a GitHub repo and connect it</li>
-          <li>Set these <strong>Environment Variables</strong> in Railway:</li>
-        </ol>
-        <div style="background:#f4f4f4;border-radius:6px;padding:16px;font-family:monospace;font-size:13px;line-height:2;margin:12px 0">
-          SHOPIFY_API_KEY=<em>your_api_key</em><br>
-          SHOPIFY_API_SECRET=<em>your_api_secret</em><br>
-          HOST=https://<em>your-app</em>.railway.app<br>
-          SCOPES=read_orders,write_orders,read_products<br>
-          NODE_ENV=production
-        </div>
-        <ol start="4" style="padding-left:18px;line-height:2.2">
-          <li>Railway will auto-detect <code>npm start</code> — make sure it's defined in package.json</li>
-          <li>After deploy, note your Railway URL (e.g. <code>https://smart-return-furor.railway.app</code>)</li>
-        </ol>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-header"><span class="card-title">Step 3 — Configure URLs in Shopify Partners</span></div>
-      <div class="card-body">
-        <ol style="padding-left:18px;line-height:2.2">
-          <li>App URL: <code>https://your-app.railway.app/</code></li>
-          <li>Redirect URL: <code>https://your-app.railway.app/auth/callback</code></li>
-          <li>Embedded app: <strong>Yes</strong></li>
-          <li>Required scopes: <code>read_orders, write_orders, read_products</code></li>
-        </ol>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-header"><span class="card-title">Step 4 — Install on Your Store</span></div>
-      <div class="card-body">
-        <p>Visit: <code>https://your-app.railway.app/auth?shop=your-store.myshopify.com</code></p>
-        <p style="margin-top:10px;color:var(--p-color-text-secondary)">After OAuth, your app will load inside Shopify Admin automatically via App Bridge.</p>
-      </div>
+      <button class="btn btn-primary" onclick="saveRules()">💾 Save Rules</button>
     </div>
   </div>
+</div>
 
-  <!-- ── HIGH RISK CUSTOMERS ── -->
-  <div id="view-highrisk" class="view">
-    <div class="callout" style="background:#fff3cd;border-color:#ffc453">
-      <h3>⚠️ High Risk Customer Detection</h3>
-      <p>Customers are automatically flagged as <strong>high-risk</strong> when their previous order was voided or refunded. New orders from these customers are tagged for review.</p>
-    </div>
-
-    <div class="stat-grid" style="grid-template-columns:repeat(3,1fr)">
-      <div class="stat-card danger">
-        <div class="stat-label">High Risk Customers</div>
-        <div class="stat-value" id="hr-count">—</div>
-        <div class="stat-sub">Tagged in store</div>
-      </div>
-      <div class="stat-card warning">
-        <div class="stat-label">Voided Orders Found</div>
-        <div class="stat-value" id="hr-voided">—</div>
-        <div class="stat-sub">Last 90 days</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">Auto-Tagged Today</div>
-        <div class="stat-value" id="hr-today">0</div>
-        <div class="stat-sub">This session</div>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-header">
-        <span class="card-title">⚠️ High Risk Customer List</span>
-        <button class="btn btn-secondary btn-sm" onclick="loadHighRisk()">↻ Refresh</button>
-      </div>
-      <div style="overflow-x:auto">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Customer</th><th>Email</th><th>Orders</th><th>Total Spent</th><th>Tags</th><th>Risk Level</th>
-            </tr>
-          </thead>
-          <tbody id="highrisk-tbody">
-            <tr><td colspan="6"><div class="empty-state" style="padding:30px 0"><span class="spinner"></span></div></td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-    <div class="card" style="margin-top:16px">
-      <div class="card-header"><span class="card-title">🔍 Scan Orders & Auto-Tag</span></div>
-      <div class="card-body">
-        <p style="color:var(--p-color-text-secondary);margin-bottom:16px;font-size:13px">
-          Scan recent orders for voided/refunded patterns and automatically tag those customers as high-risk in Shopify.
-        </p>
-        <button class="btn btn-primary" onclick="scanAndTag()" id="scan-btn">🔍 Scan & Auto-Tag High Risk Customers</button>
-        <div id="scan-results" style="margin-top:16px"></div>
-      </div>
-    </div>
-  </div>
-
-
+</div><!-- /main -->
+</div><!-- /layout -->
 
 <!-- RETURN MODAL -->
-<div class="modal-overlay" id="return-modal">
+<div class="overlay" id="return-modal">
   <div class="modal">
-    <div class="modal-header">
+    <div class="modal-head">
       <span class="modal-title">Create Return / Refund</span>
       <button class="modal-close" onclick="closeModal()">×</button>
     </div>
     <div class="modal-body">
-      <p style="color:var(--p-color-text-secondary);margin-bottom:16px;font-size:13px">Select line items to include in the return.</p>
-      <div id="modal-line-items"></div>
-      <div class="form-group" style="margin-top:16px">
+      <p style="color:var(--sub);font-size:13px;margin-bottom:14px">Select items to include in the return:</p>
+      <div id="modal-items"></div>
+      <div class="form-group" style="margin-top:14px">
         <label class="form-label">Return Reason</label>
-        <select class="form-control" id="return-reason">
-          <option value="Customer changed mind">Customer changed mind</option>
-          <option value="Wrong item received">Wrong item received</option>
-          <option value="Defective / damaged">Defective / damaged</option>
-          <option value="Item not as described">Item not as described</option>
-          <option value="Late delivery">Late delivery</option>
-          <option value="Other">Other</option>
+        <select class="form-control" id="ret-reason">
+          <option>Customer changed mind</option>
+          <option>Wrong item received</option>
+          <option>Defective / damaged</option>
+          <option>Item not as described</option>
+          <option>Late delivery</option>
+          <option>Other</option>
         </select>
       </div>
       <div class="form-group">
         <label class="form-label">Notes (optional)</label>
-        <input type="text" class="form-control" id="return-notes" placeholder="Additional notes for the refund…">
+        <input type="text" class="form-control" id="ret-notes" placeholder="Additional notes...">
       </div>
-      <div class="form-group" style="display:flex;align-items:center;gap:10px">
-        <input type="checkbox" id="notify-customer" checked style="width:16px;height:16px">
-        <label for="notify-customer" style="font-size:14px;cursor:pointer">Notify customer by email</label>
-      </div>
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+        <input type="checkbox" id="ret-notify" checked> Notify customer by email
+      </label>
     </div>
-    <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-critical" id="submit-return-btn" onclick="submitReturn()">Create Return</button>
+    <div class="modal-foot">
+      <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" id="ret-btn" onclick="submitReturn()" style="background:var(--red);border-color:var(--red)">Create Return</button>
     </div>
   </div>
 </div>
 
-<!-- TOAST -->
-<div id="toast-container"></div>
+<div id="toasts"></div>
 
 <script>
-// ── Helpers ──
-function getShop() {
-  const p = new URLSearchParams(window.location.search);
-  return p.get('shop') || '';
-}
+// ── State ──
+let allOrders = [];
+let scanResults = [];
+let currentOrder = null;
+let activeFilter = 'all';
 
+// ── Nav ──
+function navTo(page) {
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.page === page));
+  document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === `page-${page}`));
+  if (page === 'analytics') loadAnalytics();
+  if (page === 'customers') loadRiskyCustomers();
+  if (page === 'flagged' && !scanResults.length) document.getElementById('scan-alert').style.display = 'flex';
+}
+document.querySelectorAll('.nav-item').forEach(n => n.addEventListener('click', () => navTo(n.dataset.page)));
+
+// ── Tab filter ──
+document.querySelectorAll('.tab-btn').forEach(b => {
+  b.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    activeFilter = b.dataset.filter;
+    renderFlagged();
+  });
+});
+
+// ── Toast ──
 function toast(msg, type = 'info') {
   const el = document.createElement('div');
   el.className = `toast ${type}`;
   el.textContent = msg;
-  document.getElementById('toast-container').appendChild(el);
+  document.getElementById('toasts').appendChild(el);
   setTimeout(() => el.remove(), 3500);
 }
 
-async function apiFetch(path, opts = {}) {
-  const res = await fetch(path, opts);
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error(err.error || 'Request failed');
-  }
-  return res.json();
+// ── API ──
+async function api(path, opts = {}) {
+  const r = await fetch(path, opts);
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error || r.statusText); }
+  return r.json();
 }
 
-// ── Nav ──
-document.querySelectorAll('.nav-tab').forEach(tab => {
-  tab.addEventListener('click', () => {
-    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-    tab.classList.add('active');
-    document.getElementById(`view-${tab.dataset.view}`).classList.add('active');
-    if (tab.dataset.view === 'analytics') loadAnalytics();
-    if (tab.dataset.view === 'rules') renderRules();
-    if (tab.dataset.view === 'highrisk') loadHighRisk();
-  });
-});
+// ── Risk helpers ──
+function getRiskFromTags(tags = '') {
+  if (!tags) return null;
+  const t = tags.toLowerCase();
+  if (t.includes('high-risk')) return 'high';
+  if (t.includes('medium-risk')) return 'medium';
+  return null;
+}
+function riskBadge(level) {
+  if (!level) return '';
+  if (level === 'high') return '<span class="risk high">🔴 Risky</span>';
+  if (level === 'medium') return '<span class="risk medium">🟡 Medium</span>';
+  return '<span class="risk low">✅ Safe</span>';
+}
+function statusBadge(s) {
+  const v = (s||'').toLowerCase().replace(/\s/g,'');
+  return `<span class="status ${v}">${s||'Unknown'}</span>`;
+}
+function flagChips(c) {
+  if (!c) return '';
+  const chips = [];
+  if (c.voidedCount > 0) chips.push(`<span class="flag-chip cancel">${c.voidedCount} Voided</span>`);
+  if (c.refundedCount > 0) chips.push(`<span class="flag-chip return">${c.refundedCount} Returned</span>`);
+  if (c.cancelPct) chips.push(`<span class="flag-chip cancel">${c.cancelPct}% Cancel</span>`);
+  return chips.join('');
+}
 
-// ── Orders ──
-let allOrders = [];
-
+// ── Load Orders ──
 async function loadOrders() {
   try {
-    allOrders = await apiFetch('/api/orders');
-    renderOrdersTable(allOrders);
-    renderRecentOrders(allOrders.slice(0, 5));
-  } catch (e) {
-    toast('Could not load orders: ' + e.message, 'error');
-    renderOrdersTable([]);
-    renderRecentOrders([]);
+    allOrders = await api('/api/orders');
+    renderOrdersTable();
+    renderDashOrders();
+  } catch(e) {
+    toast('Orders error: ' + e.message, 'error');
   }
 }
 
-function statusBadge(val) {
-  const v = (val || 'unknown').toLowerCase();
-  return `<span class="status-badge ${v}">${val || 'Unknown'}</span>`;
-}
-
-function renderOrdersTable(orders) {
-  const tbody = document.getElementById('orders-tbody');
-  if (!orders.length) {
-    tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state" style="padding:40px 0">
-      <svg viewBox="0 0 64 64" fill="none"><circle cx="32" cy="32" r="28" stroke="currentColor" stroke-width="2"/><path d="M22 28h20M22 36h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-      <h3>No orders found</h3><p>Try adjusting your filters</p></div></td></tr>`;
-    return;
-  }
-  tbody.innerHTML = orders.map(o => `
-    <tr>
+function renderOrdersTable() {
+  const q = (document.getElementById('order-search')?.value || '').toLowerCase();
+  const f = document.getElementById('order-filter')?.value || '';
+  const rows = allOrders.filter(o => {
+    const mq = !q || o.name.toLowerCase().includes(q);
+    const mf = !f || (o.financial_status||'').includes(f);
+    return mq && mf;
+  });
+  const el = document.getElementById('orders-tbody');
+  if (!rows.length) { el.innerHTML = `<tr><td colspan="7"><div class="empty"><div class="empty-icon">📦</div><h3>No orders</h3></div></td></tr>`; return; }
+  el.innerHTML = rows.map(o => {
+    const risk = getRiskFromTags(o.customer_tags);
+    return `<tr>
       <td><strong>${o.name}</strong></td>
       <td>${new Date(o.created_at).toLocaleDateString()}</td>
+      <td><strong>$${parseFloat(o.total_price||0).toFixed(2)}</strong></td>
+      <td>${statusBadge(o.financial_status)}</td>
+      <td>${statusBadge(o.fulfillment_status||'unfulfilled')}</td>
+      <td>${risk ? riskBadge(risk) : '<span style="color:var(--sub);font-size:12px">—</span>'}</td>
+      <td><button class="btn btn-outline btn-sm" onclick='openReturn(${JSON.stringify(o)})'>↩ Return</button></td>
+    </tr>`;
+  }).join('');
+}
+
+function filterOrders() { renderOrdersTable(); }
+
+function renderDashOrders() {
+  const flagged = allOrders.filter(o =>
+    o.financial_status === 'refunded' || o.financial_status === 'voided'
+  ).slice(0, 6);
+  const el = document.getElementById('dash-orders');
+  if (!flagged.length) { el.innerHTML = `<tr><td colspan="6"><div class="empty" style="padding:30px 0"><h3>No flagged orders</h3><p>All orders look healthy</p></div></td></tr>`; return; }
+  el.innerHTML = flagged.map(o => {
+    const risk = o.financial_status === 'voided' ? 'high' : 'medium';
+    return `<tr>
+      <td><strong>${o.name}</strong></td>
+      <td>${o.customer_name || '—'}</td>
       <td>$${parseFloat(o.total_price||0).toFixed(2)}</td>
       <td>${statusBadge(o.financial_status)}</td>
-      <td>${statusBadge(o.fulfillment_status || 'unfulfilled')}</td>
-      <td><button class="btn btn-secondary btn-sm" onclick='openReturnModal(${JSON.stringify(o)})'>↩ Return</button></td>
-    </tr>`).join('');
-}
-
-function renderRecentOrders(orders) {
-  const el = document.getElementById('recent-orders-table');
-  if (!orders.length) {
-    el.innerHTML = `<div class="empty-state" style="padding:40px 0"><p>No orders to display. Check your store connection.</p></div>`;
-    return;
-  }
-  el.innerHTML = `<table class="data-table">
-    <thead><tr><th>Order</th><th>Date</th><th>Total</th><th>Status</th><th></th></tr></thead>
-    <tbody>${orders.map(o => `
-      <tr>
-        <td><strong>${o.name}</strong></td>
-        <td>${new Date(o.created_at).toLocaleDateString()}</td>
-        <td>$${parseFloat(o.total_price||0).toFixed(2)}</td>
-        <td>${statusBadge(o.financial_status)}</td>
-        <td><button class="btn btn-secondary btn-sm" onclick='openReturnModal(${JSON.stringify(o)})'>↩ Return</button></td>
-      </tr>`).join('')}
-    </tbody></table>`;
-}
-
-function filterOrders() {
-  const q = document.getElementById('order-search').value.toLowerCase();
-  const st = document.getElementById('order-status-filter').value;
-  const filtered = allOrders.filter(o => {
-    const matchQ = !q || o.name.toLowerCase().includes(q);
-    const matchS = !st || o.financial_status === st || o.fulfillment_status === st;
-    return matchQ && matchS;
-  });
-  renderOrdersTable(filtered);
+      <td>${riskBadge(risk)}</td>
+      <td><span class="flag-chip cancel">${o.financial_status}</span></td>
+    </tr>`;
+  }).join('');
 }
 
 // ── Analytics ──
 async function loadAnalytics() {
   try {
-    const data = await apiFetch('/api/analytics');
+    const d = await api('/api/analytics');
+    document.getElementById('d-total').textContent = d.totalOrders;
+    document.getElementById('d-returns').textContent = d.totalRefunds;
+    document.getElementById('d-rate').textContent = d.returnRate + '%';
+    document.getElementById('d-loss').textContent = '$' + d.refundAmount;
+    document.getElementById('a-orders').textContent = d.totalOrders;
+    document.getElementById('a-returns').textContent = d.totalRefunds;
+    document.getElementById('a-rate').textContent = d.returnRate + '%';
+    document.getElementById('a-amount').textContent = '$' + d.refundAmount;
+    document.getElementById('f-cancelled').textContent = d.totalRefunds;
 
-    // Dashboard stats
-    document.getElementById('s-orders').textContent = data.totalOrders;
-    document.getElementById('s-returns').textContent = data.totalRefunds;
-    document.getElementById('s-rate').textContent = data.returnRate + '%';
-    document.getElementById('s-amount').textContent = '$' + data.refundAmount;
+    // Performance insight
+    if (d.totalOrders > 0) {
+      const ri = document.getElementById('perf-insight');
+      ri.style.display = 'flex';
+      document.getElementById('insight-title').textContent = 'Performance Insight';
+      document.getElementById('insight-body').textContent =
+        `Your app has analyzed ${d.totalOrders} orders and found ${d.totalRefunds} with returns (${d.returnRate}% return rate). Total refunded: $${d.refundAmount}.`;
+    }
 
-    // Analytics tab stats
-    document.getElementById('a-orders').textContent = data.totalOrders;
-    document.getElementById('a-returns').textContent = data.totalRefunds;
-    document.getElementById('a-rate').textContent = data.returnRate + '%';
-    document.getElementById('a-amount').textContent = '$' + data.refundAmount;
-
-    renderBarChart('top-products-chart', data.topProducts, 'name', 'qty');
-    renderBarChart('analytics-products', data.topProducts, 'name', 'qty');
-    renderReasonList('top-reasons-chart', data.topReasons);
-    renderReasonList('analytics-reasons', data.topReasons);
-  } catch (e) {
+    renderReasons('dash-reasons', d.topReasons);
+    renderReasons('a-reasons', d.topReasons);
+    renderProducts('a-products', d.topProducts);
+    renderOffenders();
+  } catch(e) {
     toast('Analytics error: ' + e.message, 'error');
   }
 }
 
-function renderBarChart(id, items, labelKey, valKey) {
+function renderReasons(id, items) {
   const el = document.getElementById(id);
-  if (!items || !items.length) { el.innerHTML = '<p style="color:var(--p-color-text-secondary);font-size:13px">No data yet.</p>'; return; }
-  const max = Math.max(...items.map(i => i[valKey]));
-  el.innerHTML = `<div class="bar-chart">${items.map(i => `
-    <div class="bar-col">
-      <div class="bar-val">${i[valKey]}</div>
-      <div class="bar" style="height:${Math.max(12,(i[valKey]/max)*140)}px"></div>
-      <div class="bar-label">${i[labelKey]}</div>
-    </div>`).join('')}</div>`;
+  if (!items?.length) { el.innerHTML = '<p style="color:var(--sub);font-size:13px">No return reasons yet.</p>'; return; }
+  const max = Math.max(...items.map(i => i.count));
+  el.innerHTML = items.map(i => `
+    <div style="margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px">
+        <span>${i.reason}</span><strong>${i.count}</strong>
+      </div>
+      <div class="prog-wrap"><div class="prog-fill blue" style="width:${(i.count/max*100)}%"></div></div>
+    </div>`).join('');
 }
 
-function renderReasonList(id, items) {
+function renderProducts(id, items) {
   const el = document.getElementById(id);
-  if (!items || !items.length) { el.innerHTML = '<p style="color:var(--p-color-text-secondary);font-size:13px">No return reasons recorded yet.</p>'; return; }
-  const max = Math.max(...items.map(i => i.count));
-  el.innerHTML = `<div class="reason-list">${items.map(i => `
-    <div class="reason-item">
-      <div class="reason-label" title="${i.reason}">${i.reason}</div>
-      <div class="reason-bar-wrap"><div class="reason-bar" style="width:${(i.count/max)*100}%"></div></div>
-      <div class="reason-count">${i.count}</div>
-    </div>`).join('')}</div>`;
+  if (!items?.length) { el.innerHTML = '<p style="color:var(--sub);font-size:13px">No data yet.</p>'; return; }
+  const max = Math.max(...items.map(i => i.qty));
+  el.innerHTML = items.map(i => `
+    <div style="margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px">
+        <span>${i.name}</span><strong>${i.qty} returned</strong>
+      </div>
+      <div class="prog-wrap"><div class="prog-fill" style="width:${(i.qty/max*100)}%"></div></div>
+    </div>`).join('');
+}
+
+function renderOffenders() {
+  const el = document.getElementById('offender-list');
+  // Use scan results if available
+  const offenders = scanResults.slice(0, 5);
+  if (!offenders.length) {
+    el.innerHTML = '<div class="empty" style="padding:20px 0"><p>Run a scan to see repeat offenders</p><button class="btn btn-primary btn-sm" style="margin-top:10px" onclick="navTo(\'flagged\')">🔍 Run Scan</button></div>';
+    return;
+  }
+  el.innerHTML = offenders.map(c => {
+    const initials = (c.name || c.email || '?').charAt(0).toUpperCase();
+    const cancelPct = c.totalOrders ? Math.round((c.voidedCount + c.refundedCount) / c.totalOrders * 100) : 0;
+    return `<div class="offender-row">
+      <div class="offender-avatar">${initials}</div>
+      <div class="offender-info">
+        <div class="offender-name">${c.name || c.email || 'Unknown'}</div>
+        <div class="offender-meta">${c.email || ''} · ${c.totalOrders} orders</div>
+        <div class="prog-wrap" style="margin-top:6px;width:140px"><div class="prog-fill ${cancelPct>=40?'':'yellow'}" style="width:${cancelPct}%"></div></div>
+      </div>
+      <div class="offender-stats">
+        <div class="offender-val">${riskBadge(c.riskLevel)}</div>
+        <div class="offender-sub">Cancel: ${cancelPct}%</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── Scan ──
+async function runScan() {
+  const btn = document.getElementById('scan-btn');
+  const prog = document.getElementById('scan-progress');
+  btn.disabled = true; btn.textContent = '⏳ Scanning...';
+  prog.style.display = 'block';
+  prog.textContent = '🔍 Fetching 90 days of orders and analyzing customer patterns...';
+  document.getElementById('scan-alert').style.display = 'none';
+
+  try {
+    const d = await api('/api/scan-high-risk', {
+      method: 'POST', headers: {'Content-Type':'application/json'}, body: '{}'
+    });
+    scanResults = d.customers || [];
+
+    const high = scanResults.filter(c => c.riskLevel === 'high-risk').length;
+    const med = scanResults.filter(c => c.riskLevel === 'medium-risk').length;
+
+    document.getElementById('f-risky').textContent = high + med;
+    document.getElementById('f-high').textContent = high;
+    document.getElementById('flag-count').textContent = scanResults.length;
+
+    // Update tab counts
+    document.getElementById('tab-all').textContent = scanResults.length;
+    document.getElementById('tab-high').textContent = high;
+    document.getElementById('tab-cancel').textContent = scanResults.reduce((s,c)=>s+c.voidedCount+c.refundedCount,0);
+
+    renderFlagged();
+    renderOffenders();
+    prog.textContent = `✅ Scanned ${d.scanned} orders. Found ${d.flagged} risky customers. Orders tagged in Shopify.`;
+    toast(`Scan complete — ${d.flagged} customers flagged!`, 'success');
+  } catch(e) {
+    prog.textContent = '❌ Error: ' + e.message;
+    toast('Scan failed: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = '🔍 Scan & Tag';
+  }
+}
+
+function renderFlagged() {
+  const tbody = document.getElementById('flagged-tbody');
+  let rows = scanResults;
+  if (activeFilter === 'high') rows = rows.filter(c => c.riskLevel === 'high-risk');
+  if (activeFilter === 'cancelled') rows = rows.filter(c => c.voidedCount > 0);
+
+  if (!rows.length) {
+    tbody.innerHTML = `<tr><td colspan="9"><div class="empty"><div class="empty-icon">✅</div><h3>No flagged orders in this filter</h3></div></td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = rows.map(c => {
+    const cancelPct = c.totalOrders ? Math.round((c.voidedCount+c.refundedCount)/c.totalOrders*100) : 0;
+    return `<tr>
+      <td><strong>${c.badOrders.join(', ')}</strong></td>
+      <td>—</td>
+      <td>${c.name || '—'}</td>
+      <td><strong>${c.email||'—'}</strong></td>
+      <td>—</td>
+      <td>—</td>
+      <td>${riskBadge(c.riskLevel)}</td>
+      <td>${flagChips({...c, cancelPct})}</td>
+      <td></td>
+    </tr>`;
+  }).join('');
+}
+
+// ── Risky Customers ──
+async function loadRiskyCustomers() {
+  const tbody = document.getElementById('customers-tbody');
+  tbody.innerHTML = `<tr><td colspan="9"><div class="empty"><span class="spinner"></span></div></td></tr>`;
+  try {
+    const customers = await api('/api/high-risk-customers');
+    if (!customers.length) {
+      tbody.innerHTML = `<tr><td colspan="9"><div class="empty"><div class="empty-icon">👥</div><h3>No high-risk customers yet</h3><p>Run a scan from Flagged Orders</p></div></td></tr>`;
+      return;
+    }
+    tbody.innerHTML = customers.map(c => {
+      const tags = (c.tags||'').split(',').map(t=>t.trim()).filter(Boolean);
+      const risk = tags.includes('high-risk') ? 'high' : tags.includes('medium-risk') ? 'medium' : null;
+      const spent = parseFloat(c.total_spent||0).toFixed(2);
+      return `<tr>
+        <td><strong>${c.first_name||''} ${c.last_name||''}</strong></td>
+        <td>${c.email||'—'}</td>
+        <td>${c.orders_count||0}</td>
+        <td>$${spent}</td>
+        <td style="color:var(--red);font-weight:700">—</td>
+        <td style="color:var(--yellow);font-weight:700">—</td>
+        <td>—</td>
+        <td>${tags.filter(t=>!['high-risk','medium-risk'].includes(t)).map(t=>`<span class="flag-chip cancel">${t}</span>`).join('')}</td>
+        <td>${riskBadge(risk)}</td>
+      </tr>`;
+    }).join('');
+  } catch(e) {
+    toast('Customers error: ' + e.message, 'error');
+  }
 }
 
 // ── Return Modal ──
-let currentOrder = null;
-
-function openReturnModal(order) {
+function openReturn(order) {
   currentOrder = order;
-  const container = document.getElementById('modal-line-items');
-  const items = order.line_items || [];
-  container.innerHTML = items.length
-    ? items.map(li => `
-      <div class="line-item-row">
-        <input type="checkbox" class="li-check" data-id="${li.id}" checked>
-        <div class="line-item-info">
-          <div class="line-item-title">${li.title}${li.variant_title ? ' — ' + li.variant_title : ''}</div>
-          <div class="line-item-meta">$${li.price} × ${li.quantity}</div>
-        </div>
-        <input type="number" class="qty-input li-qty" data-id="${li.id}" min="1" max="${li.quantity}" value="${li.quantity}">
-      </div>`).join('')
-    : '<p style="color:var(--p-color-text-secondary)">No line items found.</p>';
-
+  document.getElementById('modal-items').innerHTML = (order.line_items||[]).map(li => `
+    <div class="li-row">
+      <input type="checkbox" class="li-chk" data-id="${li.id}" checked>
+      <div style="flex:1">
+        <div class="li-title">${li.title}${li.variant_title?' — '+li.variant_title:''}</div>
+        <div class="li-price">$${li.price} × ${li.quantity}</div>
+      </div>
+      <input type="number" class="qty-inp li-qty" data-id="${li.id}" value="${li.quantity}" min="1" max="${li.quantity}">
+    </div>`).join('') || '<p style="color:var(--sub)">No items found</p>';
   document.getElementById('return-modal').classList.add('open');
 }
 
-function closeModal() {
-  document.getElementById('return-modal').classList.remove('open');
-  currentOrder = null;
-}
+function closeModal() { document.getElementById('return-modal').classList.remove('open'); currentOrder = null; }
 
 async function submitReturn() {
   if (!currentOrder) return;
-  const btn = document.getElementById('submit-return-btn');
-  btn.disabled = true;
-  btn.textContent = 'Processing…';
-
+  const btn = document.getElementById('ret-btn');
+  btn.disabled = true; btn.textContent = 'Processing...';
   const lineItems = [];
-  document.querySelectorAll('.li-check:checked').forEach(cb => {
-    const id = cb.dataset.id;
-    const qty = parseInt(document.querySelector(`.li-qty[data-id="${id}"]`).value);
-    lineItems.push({ id, quantity: qty });
+  document.querySelectorAll('.li-chk:checked').forEach(cb => {
+    lineItems.push({ id: cb.dataset.id, quantity: parseInt(document.querySelector(`.li-qty[data-id="${cb.dataset.id}"]`).value) });
   });
-
-  const reason = document.getElementById('return-reason').value
-    + (document.getElementById('return-notes').value ? ' – ' + document.getElementById('return-notes').value : '');
-  const notify = document.getElementById('notify-customer').checked;
-
+  const reason = document.getElementById('ret-reason').value + (document.getElementById('ret-notes').value ? ' – ' + document.getElementById('ret-notes').value : '');
   try {
-    await apiFetch('/api/returns', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ orderId: currentOrder.id, lineItems, reason, notifyCustomer: notify }),
+    await api('/api/returns', { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ orderId: currentOrder.id, lineItems, reason, notifyCustomer: document.getElementById('ret-notify').checked })
     });
-    toast('Return created successfully!', 'success');
+    toast('Return created!', 'success');
     closeModal();
     loadOrders();
     loadAnalytics();
-  } catch (e) {
+  } catch(e) {
     toast('Return failed: ' + e.message, 'error');
   } finally {
-    btn.disabled = false;
-    btn.textContent = 'Create Return';
+    btn.disabled = false; btn.textContent = 'Create Return';
   }
 }
 
 // ── Rules ──
-let rules = JSON.parse(localStorage.getItem('srf-rules') || '[]');
-if (!rules.length) rules = [
-  { condition: 'days_since_order', operator: 'lte', value: '30', action: 'allow' },
-  { condition: 'order_total', operator: 'gte', value: '50', action: 'allow' },
-];
-
-function renderRules() {
-  const container = document.getElementById('rules-container');
-  if (!rules.length) {
-    container.innerHTML = '<p style="color:var(--p-color-text-secondary);font-size:13px">No rules defined. Click "Add Rule" to create one.</p>';
-    return;
-  }
-  container.innerHTML = rules.map((r, i) => `
-    <div class="rule-row">
-      <select class="form-control" onchange="rules[${i}].condition=this.value">
-        <option value="days_since_order" ${r.condition==='days_since_order'?'selected':''}>Days since order</option>
-        <option value="order_total" ${r.condition==='order_total'?'selected':''}>Order total ($)</option>
-        <option value="product_tag" ${r.condition==='product_tag'?'selected':''}>Product tag</option>
-        <option value="financial_status" ${r.condition==='financial_status'?'selected':''}>Financial status</option>
-      </select>
-      <select class="form-control" style="max-width:120px" onchange="rules[${i}].operator=this.value">
-        <option value="lte" ${r.operator==='lte'?'selected':''}>≤</option>
-        <option value="gte" ${r.operator==='gte'?'selected':''}>≥</option>
-        <option value="eq" ${r.operator==='eq'?'selected':''}>= (equals)</option>
-        <option value="contains" ${r.operator==='contains'?'selected':''}>contains</option>
-      </select>
-      <input class="form-control" style="max-width:120px" value="${r.value}" onchange="rules[${i}].value=this.value">
-      <select class="form-control" style="max-width:100px" onchange="rules[${i}].action=this.value">
-        <option value="allow" ${r.action==='allow'?'selected':''}>✅ Allow</option>
-        <option value="deny" ${r.action==='deny'?'selected':''}>❌ Deny</option>
-        <option value="review" ${r.action==='review'?'selected':''}>🔍 Review</option>
-      </select>
-      <button class="btn-icon" onclick="removeRule(${i})">✕</button>
-    </div>`).join('');
-}
-
-function addRule() {
-  rules.push({ condition: 'days_since_order', operator: 'lte', value: '30', action: 'allow' });
-  renderRules();
-}
-
-function removeRule(i) {
-  rules.splice(i, 1);
-  renderRules();
-}
-
 function saveRules() {
-  localStorage.setItem('srf-rules', JSON.stringify(rules));
+  localStorage.setItem('srf-rules', JSON.stringify({
+    highThreshold: document.getElementById('rule-high').value,
+    mediumThreshold: document.getElementById('rule-medium').value,
+    tagHigh: document.getElementById('rule-tag-high').value,
+    tagMedium: document.getElementById('rule-tag-medium').value,
+  }));
   toast('Rules saved!', 'success');
 }
 
-// ── High Risk Customers ──
-let autoTaggedToday = 0;
-
-async function loadHighRisk() {
+// ── Check webhook status ──
+async function checkWebhook() {
   try {
-    const customers = await apiFetch('/api/high-risk-customers');
-    document.getElementById('hr-count').textContent = customers.length;
-    document.getElementById('hr-today').textContent = autoTaggedToday;
-
-    const tbody = document.getElementById('highrisk-tbody');
-    if (!customers.length) {
-      tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state" style="padding:30px 0">
-        <h3>No high-risk customers found</h3>
-        <p>Run "Scan & Auto-Tag" to detect customers with voided orders</p>
-      </div></td></tr>`;
-      return;
+    const data = await api('/api/webhook-status');
+    const wh = data.webhooks?.[0];
+    const box = document.getElementById('webhook-status');
+    const title = document.getElementById('wh-title');
+    const body = document.getElementById('wh-body');
+    if (wh) {
+      box.className = 'alert info';
+      box.style.background = '#f0fdf4';
+      box.style.borderColor = '#86efac';
+      document.querySelector('#webhook-status .alert-icon').textContent = '✅';
+      title.textContent = 'Auto-Tag Webhook Active';
+      body.textContent = `Every new order is automatically checked against 90-day customer history and tagged instantly. Webhook: ${wh.address}`;
+    } else {
+      box.className = 'alert warning';
+      title.textContent = 'Auto-Tag Webhook Not Found';
+      body.textContent = 'Restart the server to register the webhook automatically.';
     }
-    tbody.innerHTML = customers.map(c => {
-      const orders = c.orders_count || 0;
-      const spent = parseFloat(c.total_spent || 0).toFixed(2);
-      const tags = (c.tags || '').split(',').map(t => t.trim()).filter(Boolean);
-      const riskLevel = tags.includes('high-risk') ?
-        '<span class="status-badge refunded">🔴 High Risk</span>' :
-        '<span class="status-badge pending">🟡 Watch</span>';
-      return `<tr>
-        <td><strong>${c.first_name || ''} ${c.last_name || ''}</strong></td>
-        <td>${c.email || '—'}</td>
-        <td>${orders}</td>
-        <td>$${spent}</td>
-        <td>${tags.map(t => `<span class="status-badge ${t === 'high-risk' ? 'refunded' : 'partial'}">${t}</span>`).join(' ')}</td>
-        <td>${riskLevel}</td>
-      </tr>`;
-    }).join('');
-  } catch (e) {
-    toast('Could not load high risk customers: ' + e.message, 'error');
-  }
-}
-
-async function scanAndTag() {
-  const btn = document.getElementById('scan-btn');
-  const results = document.getElementById('scan-results');
-  btn.disabled = true;
-  btn.textContent = '⏳ Scanning 3 months of orders...';
-  results.innerHTML = '<div style="color:var(--p-color-text-secondary);padding:12px">🔍 Fetching last 90 days of orders and checking each customer\'s history...</div>';
-
-  try {
-    const data = await apiFetch('/api/scan-high-risk', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({}),
-    });
-
-    document.getElementById('hr-voided').textContent = data.customers.reduce((s, c) => s + c.voidedCount, 0);
-    autoTaggedToday += data.flagged;
-    document.getElementById('hr-today').textContent = autoTaggedToday;
-    document.getElementById('hr-count').textContent = data.customers.filter(c => c.riskLevel === 'high-risk').length;
-
-    if (!data.flagged) {
-      results.innerHTML = '<div style="color:var(--p-color-success);padding:12px;background:#e3f1df;border-radius:6px">✅ No risky customers found in the last 90 days!</div>';
-      return;
-    }
-
-    results.innerHTML = `
-      <div style="color:#b07800;padding:12px;background:#fff3cd;border-radius:6px;margin-bottom:16px">
-        Scanned <strong>${data.scanned}</strong> orders → flagged <strong>${data.flagged}</strong> customers
-      </div>
-      <table class="data-table">
-        <thead><tr>
-          <th>Customer</th><th>Email</th><th>Total Orders</th>
-          <th>Voided</th><th>Refunded</th><th>Bad Orders</th><th>Risk</th>
-        </tr></thead>
-        <tbody>
-          ${data.customers.map(c => `<tr>
-            <td><strong>${c.name || '—'}</strong></td>
-            <td>${c.email || '—'}</td>
-            <td>${c.totalOrders}</td>
-            <td><strong style="color:var(--p-color-critical)">${c.voidedCount}</strong></td>
-            <td><strong style="color:#b07800">${c.refundedCount}</strong></td>
-            <td style="font-size:12px">${c.badOrders.join(', ')}</td>
-            <td>${c.riskLevel === 'high-risk'
-              ? '<span class="status-badge refunded">🔴 HIGH RISK</span>'
-              : '<span class="status-badge pending">🟡 MEDIUM</span>'}</td>
-          </tr>`).join('')}
-        </tbody>
-      </table>`;
-
-    await loadHighRisk();
-    toast(`${data.flagged} customers scanned and tagged!`, 'success');
-  } catch (e) {
-    results.innerHTML = `<div style="color:var(--p-color-critical);padding:12px;background:#fce8e6;border-radius:6px">❌ ${e.message}</div>`;
-    toast('Scan failed: ' + e.message, 'error');
-  } finally {
-    btn.disabled = false;
-    btn.textContent = '🔍 Scan & Auto-Tag High Risk Customers';
+  } catch(e) {
+    console.warn('Webhook check failed:', e.message);
   }
 }
 
@@ -937,7 +838,7 @@ async function scanAndTag() {
 (async () => {
   await loadOrders();
   await loadAnalytics();
-  renderRules();
+  await checkWebhook();
 })();
 </script>
 </body>

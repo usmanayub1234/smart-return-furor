@@ -334,5 +334,168 @@ app.get("/api/analytics", async (req, res) => {
   }
 });
 
+// ════════════════════════════════════════════════
+// AUTO-TAG ENGINE
+// Fires on every new order via Shopify webhook
+// Checks customer's last 90 days → tags instantly
+// ════════════════════════════════════════════════
+
+// ── Core risk checker: given a customerId, analyse 90-day history ──
+async function analyseCustomerRisk(customerId) {
+  const since = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+  const data = await shopifyGQL(`{
+    orders(first: 250, query: "customer_id:${customerId} created_at:>='${since}'") {
+      edges { node {
+        id
+        name
+        displayFinancialStatus
+        refunds { id }
+      }}
+    }
+  }`);
+
+  if (data.errors) throw new Error(data.errors[0].message);
+  const orders = data.data.orders.edges.map(e => e.node);
+
+  let voidedCount = 0, refundedCount = 0;
+  const badOrders = [];
+
+  for (const o of orders) {
+    const status = (o.displayFinancialStatus || "").toLowerCase();
+    if (status === "voided") { voidedCount++; badOrders.push(o.name); }
+    if (status === "refunded" || o.refunds?.length > 0) { refundedCount++; badOrders.push(o.name); }
+  }
+
+  const badCount = voidedCount + refundedCount;
+  const riskLevel = badCount >= 2 ? "high-risk" : badCount === 1 ? "medium-risk" : null;
+
+  return { totalOrders: orders.length, voidedCount, refundedCount, badCount, badOrders: [...new Set(badOrders)], riskLevel };
+}
+
+// ── Apply tags to customer + new order ──
+async function applyRiskTags(customerId, newOrderId, risk) {
+  const { riskLevel, badCount, badOrders, voidedCount, refundedCount } = risk;
+  if (!riskLevel) return; // safe customer — no tagging
+
+  // 1. Tag the customer profile
+  const custData = await shopifyRequest("GET", `customers/${customerId}.json`);
+  const existing = custData.customer?.tags
+    ? custData.customer.tags.split(",").map(t => t.trim()).filter(Boolean)
+    : [];
+
+  const newTags = [riskLevel];
+  if (voidedCount > 0) newTags.push("voided-order");
+  if (refundedCount > 0) newTags.push("frequent-returns");
+  const merged = [...new Set([...existing, ...newTags])];
+
+  await shopifyRequest("PUT", `customers/${customerId}.json`, {
+    customer: {
+      id: customerId,
+      tags: merged.join(", "),
+      note: `⚠️ Auto-flagged by Smart Return Furor: ${badCount} voided/refunded order(s) in last 90 days. Bad orders: ${badOrders.join(", ")}`,
+    },
+  });
+
+  // 2. Tag the new order
+  const orderTag = riskLevel === "high-risk"
+    ? "Smart Returns - High Risk Order"
+    : "Smart Returns - Medium Risk Order";
+
+  const orderData = await shopifyRequest("GET", `orders/${newOrderId}.json?fields=id,tags`);
+  const existingOrderTags = orderData.order?.tags
+    ? orderData.order.tags.split(",").map(t => t.trim()).filter(Boolean)
+    : [];
+
+  if (!existingOrderTags.includes(orderTag)) {
+    existingOrderTags.push(orderTag);
+    await shopifyRequest("PUT", `orders/${newOrderId}.json`, {
+      order: { id: newOrderId, tags: existingOrderTags.join(", ") },
+    });
+  }
+
+  console.log(`✅ Auto-tagged order ${newOrderId} and customer ${customerId} as ${riskLevel}`);
+  return { riskLevel, orderTag, customerTags: merged };
+}
+
+// ── Webhook: orders/create — fires on every new order ──
+app.post("/webhooks/orders/create", express.raw({ type: "application/json" }), async (req, res) => {
+  res.sendStatus(200); // Always respond 200 immediately to Shopify
+
+  try {
+    const order = JSON.parse(req.body.toString());
+    const customerId = order.customer?.id;
+    const orderId = order.id;
+
+    if (!customerId) {
+      console.log(`Webhook: Order ${order.name} has no customer — skipping`);
+      return;
+    }
+
+    console.log(`🔔 New order ${order.name} from customer ${customerId} — checking risk...`);
+
+    const risk = await analyseCustomerRisk(customerId);
+    console.log(`Customer ${customerId}: ${risk.badCount} bad orders in 90 days → ${risk.riskLevel || "safe"}`);
+
+    if (risk.riskLevel) {
+      await applyRiskTags(customerId, orderId, risk);
+      console.log(`🚨 Flagged order ${order.name} as ${risk.riskLevel}`);
+    } else {
+      console.log(`✅ Order ${order.name} — customer is safe`);
+    }
+  } catch (e) {
+    console.error("Webhook processing error:", e.message);
+  }
+});
+
+// ── Register the webhook with Shopify (called once on startup) ──
+async function registerWebhook() {
+  const HOST = process.env.HOST;
+  if (!HOST) { console.warn("⚠️ HOST not set — webhook not registered"); return; }
+
+  try {
+    // Check if webhook already exists
+    const existing = await shopifyRequest("GET", "webhooks.json?topic=orders/create");
+    const alreadyRegistered = existing.webhooks?.some(w =>
+      w.address === `${HOST}/webhooks/orders/create`
+    );
+
+    if (alreadyRegistered) {
+      console.log("✅ Webhook already registered");
+      return;
+    }
+
+    // Register new webhook
+    const result = await shopifyRequest("POST", "webhooks.json", {
+      webhook: {
+        topic: "orders/create",
+        address: `${HOST}/webhooks/orders/create`,
+        format: "json",
+      },
+    });
+    console.log("✅ Webhook registered:", result.webhook?.id, "→", result.webhook?.address);
+  } catch (e) {
+    console.error("❌ Webhook registration failed:", e.message);
+  }
+}
+
+// ── Health ──
+app.get("/health", (req, res) => {
+  res.json({ status: "ok", shop: SHOP, tokenSet: !!TOKEN });
+});
+
+// ── Webhook status endpoint ──
+app.get("/api/webhook-status", async (req, res) => {
+  try {
+    const data = await shopifyRequest("GET", "webhooks.json?topic=orders/create");
+    res.json({ webhooks: data.webhooks || [] });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Smart Return Furor → https://${SHOP} on port ${PORT}`));
+app.listen(PORT, async () => {
+  console.log(`Smart Return Furor → https://${SHOP} on port ${PORT}`);
+  // Register webhook after server starts
+  await registerWebhook();
+});
