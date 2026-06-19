@@ -286,6 +286,7 @@
   <div class="nav-tab active" data-view="dashboard">Dashboard</div>
   <div class="nav-tab" data-view="orders">Orders & Returns</div>
   <div class="nav-tab" data-view="analytics">Analytics</div>
+  <div class="nav-tab" data-view="highrisk">⚠️ High Risk</div>
   <div class="nav-tab" data-view="rules">Return Rules</div>
   <div class="nav-tab" data-view="setup">Setup Guide</div>
 </div>
@@ -467,7 +468,63 @@
     </div>
   </div>
 
-</div><!-- end page-content -->
+  <!-- ── HIGH RISK CUSTOMERS ── -->
+  <div id="view-highrisk" class="view">
+    <div class="callout" style="background:#fff3cd;border-color:#ffc453">
+      <h3>⚠️ High Risk Customer Detection</h3>
+      <p>Customers are automatically flagged as <strong>high-risk</strong> when their previous order was voided or refunded. New orders from these customers are tagged for review.</p>
+    </div>
+
+    <div class="stat-grid" style="grid-template-columns:repeat(3,1fr)">
+      <div class="stat-card danger">
+        <div class="stat-label">High Risk Customers</div>
+        <div class="stat-value" id="hr-count">—</div>
+        <div class="stat-sub">Tagged in store</div>
+      </div>
+      <div class="stat-card warning">
+        <div class="stat-label">Voided Orders Found</div>
+        <div class="stat-value" id="hr-voided">—</div>
+        <div class="stat-sub">Last 90 days</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Auto-Tagged Today</div>
+        <div class="stat-value" id="hr-today">0</div>
+        <div class="stat-sub">This session</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">⚠️ High Risk Customer List</span>
+        <button class="btn btn-secondary btn-sm" onclick="loadHighRisk()">↻ Refresh</button>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Customer</th><th>Email</th><th>Orders</th><th>Total Spent</th><th>Tags</th><th>Risk Level</th>
+            </tr>
+          </thead>
+          <tbody id="highrisk-tbody">
+            <tr><td colspan="6"><div class="empty-state" style="padding:30px 0"><span class="spinner"></span></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <div class="card-header"><span class="card-title">🔍 Scan Orders & Auto-Tag</span></div>
+      <div class="card-body">
+        <p style="color:var(--p-color-text-secondary);margin-bottom:16px;font-size:13px">
+          Scan recent orders for voided/refunded patterns and automatically tag those customers as high-risk in Shopify.
+        </p>
+        <button class="btn btn-primary" onclick="scanAndTag()" id="scan-btn">🔍 Scan & Auto-Tag High Risk Customers</button>
+        <div id="scan-results" style="margin-top:16px"></div>
+      </div>
+    </div>
+  </div>
+
+
 
 <!-- RETURN MODAL -->
 <div class="modal-overlay" id="return-modal">
@@ -542,6 +599,7 @@ document.querySelectorAll('.nav-tab').forEach(tab => {
     document.getElementById(`view-${tab.dataset.view}`).classList.add('active');
     if (tab.dataset.view === 'analytics') loadAnalytics();
     if (tab.dataset.view === 'rules') renderRules();
+    if (tab.dataset.view === 'highrisk') loadHighRisk();
   });
 });
 
@@ -776,6 +834,103 @@ function removeRule(i) {
 function saveRules() {
   localStorage.setItem('srf-rules', JSON.stringify(rules));
   toast('Rules saved!', 'success');
+}
+
+// ── High Risk Customers ──
+let autoTaggedToday = 0;
+
+async function loadHighRisk() {
+  try {
+    const customers = await apiFetch('/api/high-risk-customers');
+    document.getElementById('hr-count').textContent = customers.length;
+    document.getElementById('hr-today').textContent = autoTaggedToday;
+
+    const tbody = document.getElementById('highrisk-tbody');
+    if (!customers.length) {
+      tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state" style="padding:30px 0">
+        <h3>No high-risk customers found</h3>
+        <p>Run "Scan & Auto-Tag" to detect customers with voided orders</p>
+      </div></td></tr>`;
+      return;
+    }
+    tbody.innerHTML = customers.map(c => {
+      const orders = c.orders_count || 0;
+      const spent = parseFloat(c.total_spent || 0).toFixed(2);
+      const tags = (c.tags || '').split(',').map(t => t.trim()).filter(Boolean);
+      const riskLevel = tags.includes('high-risk') ?
+        '<span class="status-badge refunded">🔴 High Risk</span>' :
+        '<span class="status-badge pending">🟡 Watch</span>';
+      return `<tr>
+        <td><strong>${c.first_name || ''} ${c.last_name || ''}</strong></td>
+        <td>${c.email || '—'}</td>
+        <td>${orders}</td>
+        <td>$${spent}</td>
+        <td>${tags.map(t => `<span class="status-badge ${t === 'high-risk' ? 'refunded' : 'partial'}">${t}</span>`).join(' ')}</td>
+        <td>${riskLevel}</td>
+      </tr>`;
+    }).join('');
+  } catch (e) {
+    toast('Could not load high risk customers: ' + e.message, 'error');
+  }
+}
+
+async function scanAndTag() {
+  const btn = document.getElementById('scan-btn');
+  const results = document.getElementById('scan-results');
+  btn.disabled = true;
+  btn.textContent = '⏳ Scanning 3 months of orders...';
+  results.innerHTML = '<div style="color:var(--p-color-text-secondary);padding:12px">🔍 Fetching last 90 days of orders and checking each customer\'s history...</div>';
+
+  try {
+    const data = await apiFetch('/api/scan-high-risk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+
+    document.getElementById('hr-voided').textContent = data.customers.reduce((s, c) => s + c.voidedCount, 0);
+    autoTaggedToday += data.flagged;
+    document.getElementById('hr-today').textContent = autoTaggedToday;
+    document.getElementById('hr-count').textContent = data.customers.filter(c => c.riskLevel === 'high-risk').length;
+
+    if (!data.flagged) {
+      results.innerHTML = '<div style="color:var(--p-color-success);padding:12px;background:#e3f1df;border-radius:6px">✅ No risky customers found in the last 90 days!</div>';
+      return;
+    }
+
+    results.innerHTML = `
+      <div style="color:#b07800;padding:12px;background:#fff3cd;border-radius:6px;margin-bottom:16px">
+        Scanned <strong>${data.scanned}</strong> orders → flagged <strong>${data.flagged}</strong> customers
+      </div>
+      <table class="data-table">
+        <thead><tr>
+          <th>Customer</th><th>Email</th><th>Total Orders</th>
+          <th>Voided</th><th>Refunded</th><th>Bad Orders</th><th>Risk</th>
+        </tr></thead>
+        <tbody>
+          ${data.customers.map(c => `<tr>
+            <td><strong>${c.name || '—'}</strong></td>
+            <td>${c.email || '—'}</td>
+            <td>${c.totalOrders}</td>
+            <td><strong style="color:var(--p-color-critical)">${c.voidedCount}</strong></td>
+            <td><strong style="color:#b07800">${c.refundedCount}</strong></td>
+            <td style="font-size:12px">${c.badOrders.join(', ')}</td>
+            <td>${c.riskLevel === 'high-risk'
+              ? '<span class="status-badge refunded">🔴 HIGH RISK</span>'
+              : '<span class="status-badge pending">🟡 MEDIUM</span>'}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>`;
+
+    await loadHighRisk();
+    toast(`${data.flagged} customers scanned and tagged!`, 'success');
+  } catch (e) {
+    results.innerHTML = `<div style="color:var(--p-color-critical);padding:12px;background:#fce8e6;border-radius:6px">❌ ${e.message}</div>`;
+    toast('Scan failed: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '🔍 Scan & Auto-Tag High Risk Customers';
+  }
 }
 
 // ── Init ──
