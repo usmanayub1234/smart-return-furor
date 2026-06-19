@@ -216,6 +216,26 @@ app.post("/api/scan-high-risk", async (req, res) => {
           },
         });
 
+        // Also tag all NEW (non-bad) orders from this customer as high-risk
+        const newOrders = orders.filter(o =>
+          o.customer?.legacyResourceId === cid &&
+          !c.badOrders.includes(o.name)
+        );
+        for (const newOrder of newOrders) {
+          const orderId = newOrder.id.replace("gid://shopify/Order/", "");
+          const existingOrder = await shopifyRequest("GET", `orders/${orderId}.json?fields=id,tags`);
+          const existingOrderTags = existingOrder.order?.tags
+            ? existingOrder.order.tags.split(",").map(t => t.trim()).filter(Boolean)
+            : [];
+          const riskTag = badCount >= 2 ? "Smart Returns - High Risk Order" : "Smart Returns - Medium Risk Order";
+          if (!existingOrderTags.includes(riskTag)) {
+            existingOrderTags.push(riskTag);
+            await shopifyRequest("PUT", `orders/${orderId}.json`, {
+              order: { id: orderId, tags: existingOrderTags.join(", ") },
+            });
+          }
+        }
+
         results.push({
           customerId: cid,
           name: c.name,
