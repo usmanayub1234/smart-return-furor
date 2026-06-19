@@ -77,6 +77,7 @@ app.get("/api/orders", async (req, res) => {
           id name createdAt
           displayFinancialStatus displayFulfillmentStatus
           totalPriceSet { shopMoney { amount } }
+          customer { id legacyResourceId }
           lineItems(first: 10) { edges { node {
             id title variantTitle quantity
             originalUnitPriceSet { shopMoney { amount } }
@@ -91,6 +92,7 @@ app.get("/api/orders", async (req, res) => {
       id:                 o.id.replace("gid://shopify/Order/", ""),
       name:               o.name,
       created_at:         o.createdAt,
+      customer_id:        o.customer?.legacyResourceId || null,
       financial_status:   (o.displayFinancialStatus || "").toLowerCase().replace(/_/g, " "),
       fulfillment_status: (o.displayFulfillmentStatus || "unfulfilled").toLowerCase().replace(/_/g, " "),
       total_price:        o.totalPriceSet?.shopMoney?.amount || "0",
@@ -120,13 +122,137 @@ app.post("/api/returns", async (req, res) => {
         refund_line_items: (lineItems || []).map(li => ({
           line_item_id: li.id,
           quantity: li.quantity,
-          restock_type: "return",
+          restock_type: "no_restock",
         })),
       },
     });
+    if (data.errors) throw new Error(JSON.stringify(data.errors));
     res.json(data.refund);
   } catch (e) {
     console.error("Return error:", e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ── Scan customers: 3-month order history → smart risk tagging ──
+app.post("/api/scan-high-risk", async (req, res) => {
+  try {
+    const since = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+
+    // Fetch all orders in last 3 months with customer info
+    const data = await shopifyGQL(`{
+      orders(first: 250, query: "created_at:>='${since.split("T")[0]}'") {
+        edges { node {
+          id
+          name
+          displayFinancialStatus
+          createdAt
+          customer { id legacyResourceId firstName lastName email }
+          refunds { id }
+        }}
+      }
+    }`);
+
+    if (data.errors) throw new Error(data.errors[0].message);
+
+    const orders = data.data.orders.edges.map(e => e.node);
+
+    // Group by customer — count voided + refunded orders per customer
+    const customerMap = {};
+    for (const order of orders) {
+      if (!order.customer) continue;
+      const cid = order.customer.legacyResourceId;
+      if (!customerMap[cid]) {
+        customerMap[cid] = {
+          customerId: cid,
+          name: `${order.customer.firstName || ""} ${order.customer.lastName || ""}`.trim(),
+          email: order.customer.email,
+          totalOrders: 0,
+          voidedCount: 0,
+          refundedCount: 0,
+          badOrders: [],
+        };
+      }
+      customerMap[cid].totalOrders++;
+      const status = (order.displayFinancialStatus || "").toLowerCase();
+      if (status === "voided") {
+        customerMap[cid].voidedCount++;
+        customerMap[cid].badOrders.push(order.name);
+      }
+      if (status === "refunded" || order.refunds?.length > 0) {
+        customerMap[cid].refundedCount++;
+        customerMap[cid].badOrders.push(order.name);
+      }
+    }
+
+    // Determine risk level per customer
+    // HIGH RISK: 2+ voided/refunded in 3 months
+    // MEDIUM RISK: 1 voided/refunded
+    const results = [];
+    for (const [cid, c] of Object.entries(customerMap)) {
+      const badCount = c.voidedCount + c.refundedCount;
+      if (badCount === 0) continue;
+
+      let riskLevel = badCount >= 2 ? "high-risk" : "medium-risk";
+      let tags = [riskLevel];
+      if (c.voidedCount > 0) tags.push("voided-order");
+      if (c.refundedCount > 0) tags.push("frequent-returns");
+
+      // Get current tags and merge
+      try {
+        const custData = await shopifyRequest("GET", `customers/${cid}.json`);
+        const existing = custData.customer?.tags
+          ? custData.customer.tags.split(",").map(t => t.trim()).filter(Boolean)
+          : [];
+
+        const merged = [...new Set([...existing, ...tags])];
+
+        // Update customer tags
+        await shopifyRequest("PUT", `customers/${cid}.json`, {
+          customer: {
+            id: cid,
+            tags: merged.join(", "),
+            note: `⚠️ Auto-flagged: ${badCount} voided/refunded order(s) in last 90 days. Orders: ${[...new Set(c.badOrders)].join(", ")}`,
+          },
+        });
+
+        results.push({
+          customerId: cid,
+          name: c.name,
+          email: c.email,
+          totalOrders: c.totalOrders,
+          voidedCount: c.voidedCount,
+          refundedCount: c.refundedCount,
+          badOrders: [...new Set(c.badOrders)],
+          riskLevel,
+          tags: merged,
+        });
+      } catch (e) {
+        console.warn(`Could not tag customer ${cid}:`, e.message);
+      }
+    }
+
+    // Sort by risk: high first, then by bad order count
+    results.sort((a, b) => {
+      if (a.riskLevel === "high-risk" && b.riskLevel !== "high-risk") return -1;
+      if (b.riskLevel === "high-risk" && a.riskLevel !== "high-risk") return 1;
+      return (b.voidedCount + b.refundedCount) - (a.voidedCount + a.refundedCount);
+    });
+
+    res.json({ scanned: orders.length, flagged: results.length, customers: results });
+  } catch (e) {
+    console.error("Scan error:", e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ── Get high-risk customers from Shopify ──
+app.get("/api/high-risk-customers", async (req, res) => {
+  try {
+    const data = await shopifyRequest("GET", `customers.json?tag=high-risk&limit=50`);
+    res.json(data.customers || []);
+  } catch (e) {
+    console.error("High risk customers error:", e.message);
     res.status(500).json({ error: e.message });
   }
 });
