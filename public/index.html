@@ -4,156 +4,273 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>Smart Return Furor</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
 <style>
 :root {
-  --bg:#f4f6f8;--surface:#fff;--border:#e3e7ed;--text:#1a1f36;--sub:#6b7280;
-  --blue:#2563eb;--green:#059669;--red:#dc2626;--yellow:#d97706;--purple:#7c3aed;
-  --radius:10px;--shadow:0 1px 4px rgba(0,0,0,.08);
+  --bg:#0f1117;
+  --surface:#1a1d27;
+  --surface2:#21263a;
+  --border:#2a2f45;
+  --text:#f0f2ff;
+  --sub:#8b92b3;
+  --blue:#4f7cff;
+  --blue-soft:#1e2d5c;
+  --green:#00d48a;
+  --green-soft:#0a2e22;
+  --red:#ff4f6b;
+  --red-soft:#2e0a14;
+  --yellow:#ffb84f;
+  --yellow-soft:#2e200a;
+  --purple:#a855f7;
+  --purple-soft:#1e0a2e;
+  --radius:14px;
+  --radius-sm:8px;
+  --shadow:0 4px 24px rgba(0,0,0,.4);
+  font-family:'Inter',sans-serif;
 }
 *{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);font-size:14px;}
+body{background:var(--bg);color:var(--text);font-size:14px;line-height:1.6;}
+
+/* SCROLLBAR */
+::-webkit-scrollbar{width:6px;height:6px;}
+::-webkit-scrollbar-track{background:var(--bg);}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;}
 
 /* TOP BAR */
-.topbar{background:#1e2d5a;color:#fff;height:52px;display:flex;align-items:center;padding:0 20px;gap:12px;}
-.topbar-logo{width:28px;height:28px;background:#e84393;border-radius:6px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;}
-.topbar-title{font-weight:700;font-size:15px;}
-.topbar-store{margin-left:auto;background:rgba(255,255,255,.1);padding:4px 12px;border-radius:20px;font-size:12px;}
+.topbar{
+  background:linear-gradient(135deg,#1a1d27 0%,#12151f 100%);
+  border-bottom:1px solid var(--border);
+  height:60px;display:flex;align-items:center;padding:0 24px;gap:14px;
+  position:sticky;top:0;z-index:100;
+  box-shadow:0 2px 20px rgba(0,0,0,.5);
+}
+.topbar-logo{
+  width:36px;height:36px;
+  background:linear-gradient(135deg,#4f7cff,#a855f7);
+  border-radius:10px;display:flex;align-items:center;justify-content:center;
+  font-weight:900;font-size:14px;letter-spacing:-1px;
+  box-shadow:0 0 20px rgba(79,124,255,.4);
+}
+.topbar-title{font-weight:800;font-size:17px;letter-spacing:-.3px;background:linear-gradient(135deg,#fff,#8b92b3);-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.topbar-badge{background:linear-gradient(135deg,#4f7cff,#a855f7);color:#fff;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;letter-spacing:.5px;}
+.topbar-store{margin-left:auto;background:var(--surface2);border:1px solid var(--border);padding:6px 14px;border-radius:20px;font-size:12px;font-weight:600;color:var(--sub);display:flex;align-items:center;gap:6px;}
+.topbar-store::before{content:'';width:7px;height:7px;background:var(--green);border-radius:50%;display:inline-block;box-shadow:0 0 8px var(--green);}
+
+/* LAYOUT */
+.layout{display:flex;min-height:calc(100vh - 60px);}
 
 /* SIDEBAR */
-.layout{display:flex;min-height:calc(100vh - 52px);}
-.sidebar{width:200px;background:var(--surface);border-right:1px solid var(--border);padding:16px 0;flex-shrink:0;}
-.sidebar-label{font-size:11px;font-weight:600;color:var(--sub);padding:8px 16px 4px;text-transform:uppercase;letter-spacing:.6px;}
-.nav-item{display:flex;align-items:center;gap:8px;padding:9px 16px;cursor:pointer;color:var(--sub);font-size:13px;font-weight:500;border-left:3px solid transparent;transition:.15s;}
-.nav-item:hover{background:#f0f4ff;color:var(--text);}
-.nav-item.active{background:#eff6ff;color:var(--blue);border-left-color:var(--blue);}
-.nav-item .icon{width:16px;text-align:center;}
-.badge-count{margin-left:auto;background:var(--red);color:#fff;border-radius:10px;padding:1px 7px;font-size:11px;font-weight:700;}
+.sidebar{
+  width:220px;background:var(--surface);border-right:1px solid var(--border);
+  padding:20px 0;flex-shrink:0;position:sticky;top:60px;height:calc(100vh - 60px);overflow-y:auto;
+}
+.sidebar-section{padding:6px 16px 4px;font-size:10px;font-weight:800;color:var(--sub);text-transform:uppercase;letter-spacing:1.5px;margin-top:8px;}
+.nav-item{
+  display:flex;align-items:center;gap:10px;padding:10px 16px;cursor:pointer;
+  color:var(--sub);font-size:13px;font-weight:600;
+  border-left:3px solid transparent;transition:all .2s;margin:2px 0;
+  border-radius:0 8px 8px 0;margin-right:8px;
+}
+.nav-item:hover{background:var(--surface2);color:var(--text);}
+.nav-item.active{background:var(--blue-soft);color:var(--blue);border-left-color:var(--blue);}
+.nav-item .icon{font-size:18px;}
+.nav-badge{margin-left:auto;background:var(--red);color:#fff;border-radius:10px;padding:2px 8px;font-size:11px;font-weight:800;}
 
 /* MAIN */
-.main{flex:1;padding:24px;overflow-x:hidden;}
-.page{display:none;}.page.active{display:block;}
-.page-title{font-size:22px;font-weight:700;margin-bottom:4px;}
-.page-sub{font-size:13px;color:var(--sub);margin-bottom:20px;}
+.main{flex:1;padding:28px;overflow-x:hidden;max-width:calc(100vw - 220px);}
+.page{display:none;animation:fadeIn .2s ease;}
+.page.active{display:block;}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:none;}}
+
+/* PAGE HEADER */
+.page-header{margin-bottom:24px;}
+.page-title{font-size:26px;font-weight:900;letter-spacing:-.5px;margin-bottom:4px;}
+.page-sub{font-size:13px;color:var(--sub);font-weight:500;}
 
 /* STAT CARDS */
-.stat-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:20px;}
-.stat-card{background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);padding:20px;box-shadow:var(--shadow);}
-.stat-label{font-size:12px;color:var(--sub);font-weight:500;margin-bottom:8px;}
-.stat-value{font-size:30px;font-weight:800;line-height:1;}
-.stat-desc{font-size:12px;color:var(--sub);margin-top:6px;}
-.stat-change{font-size:12px;font-weight:600;margin-top:4px;}
-.stat-change.up{color:var(--red);}
-.stat-change.down{color:var(--green);}
+.stat-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:24px;}
+.stat-card{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  padding:22px;position:relative;overflow:hidden;transition:transform .2s,box-shadow .2s;
+}
+.stat-card:hover{transform:translateY(-2px);box-shadow:var(--shadow);}
+.stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;}
+.stat-card.blue::before{background:linear-gradient(90deg,#4f7cff,#a855f7);}
+.stat-card.green::before{background:linear-gradient(90deg,#00d48a,#4f7cff);}
+.stat-card.red::before{background:linear-gradient(90deg,#ff4f6b,#ffb84f);}
+.stat-card.yellow::before{background:linear-gradient(90deg,#ffb84f,#ff4f6b);}
+.stat-card.purple::before{background:linear-gradient(90deg,#a855f7,#4f7cff);}
+.stat-icon{width:42px;height:42px;border-radius:10px;display:flex;align-items:center;justify-content:center;margin-bottom:14px;font-size:20px;}
+.stat-icon.blue{background:var(--blue-soft);color:var(--blue);}
+.stat-icon.green{background:var(--green-soft);color:var(--green);}
+.stat-icon.red{background:var(--red-soft);color:var(--red);}
+.stat-icon.yellow{background:var(--yellow-soft);color:var(--yellow);}
+.stat-icon.purple{background:var(--purple-soft);color:var(--purple);}
+.stat-label{font-size:12px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px;}
+.stat-value{font-size:34px;font-weight:900;letter-spacing:-1px;line-height:1;}
+.stat-desc{font-size:12px;color:var(--sub);margin-top:6px;font-weight:500;}
 
 /* CARDS */
-.card{background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);box-shadow:var(--shadow);margin-bottom:16px;}
-.card-head{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
-.card-title{font-size:14px;font-weight:700;}
-.card-body{padding:18px;}
+.card{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  margin-bottom:20px;overflow:hidden;
+}
+.card-head{
+  padding:16px 20px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;
+}
+.card-title{font-size:15px;font-weight:800;letter-spacing:-.2px;display:flex;align-items:center;gap:8px;}
+.card-body{padding:20px;}
 
 /* ALERT */
-.alert{border-radius:var(--radius);padding:14px 18px;margin-bottom:16px;display:flex;gap:10px;align-items:flex-start;}
-.alert.warning{background:#fffbeb;border:1px solid #fcd34d;}
-.alert.info{background:#eff6ff;border:1px solid #bfdbfe;}
-.alert-icon{font-size:18px;flex-shrink:0;}
-.alert-text strong{display:block;font-size:13px;font-weight:700;margin-bottom:2px;}
-.alert-text span{font-size:12px;color:var(--sub);}
+.alert{border-radius:var(--radius-sm);padding:14px 18px;margin-bottom:20px;display:flex;gap:12px;align-items:flex-start;border:1px solid;}
+.alert.warning{background:var(--yellow-soft);border-color:#3a2a0a;}
+.alert.info{background:var(--blue-soft);border-color:#1a2a5c;}
+.alert.success{background:var(--green-soft);border-color:#0a3a22;}
+.alert-icon{font-size:20px;flex-shrink:0;margin-top:1px;}
+.alert strong{display:block;font-size:13px;font-weight:800;margin-bottom:3px;}
+.alert span{font-size:12px;color:var(--sub);}
 
 /* TABS */
-.tab-bar{display:flex;gap:4px;margin-bottom:16px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:4px;width:fit-content;}
-.tab-btn{padding:7px 16px;border-radius:6px;border:none;background:none;cursor:pointer;font-size:13px;font-weight:500;color:var(--sub);transition:.15s;}
-.tab-btn.active{background:var(--blue);color:#fff;}
-.tab-count{display:inline-block;background:rgba(0,0,0,.1);border-radius:10px;padding:0 6px;font-size:11px;margin-left:4px;}
-.tab-btn.active .tab-count{background:rgba(255,255,255,.25);}
+.tab-bar{display:flex;gap:4px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:4px;width:fit-content;}
+.tab-btn{padding:7px 18px;border-radius:7px;border:none;background:none;cursor:pointer;font-size:13px;font-weight:700;color:var(--sub);transition:all .2s;font-family:'Inter',sans-serif;}
+.tab-btn:hover{color:var(--text);}
+.tab-btn.active{background:linear-gradient(135deg,#4f7cff,#a855f7);color:#fff;box-shadow:0 2px 12px rgba(79,124,255,.4);}
+.tab-count{display:inline-block;background:rgba(255,255,255,.15);border-radius:8px;padding:0 6px;font-size:11px;margin-left:4px;}
 
 /* TABLE */
 .data-table{width:100%;border-collapse:collapse;}
-.data-table th{text-align:left;padding:10px 14px;font-size:11px;font-weight:600;color:var(--sub);text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border);white-space:nowrap;}
-.data-table td{padding:13px 14px;border-bottom:1px solid var(--border);font-size:13px;vertical-align:middle;}
+.data-table th{
+  text-align:left;padding:11px 16px;
+  font-size:11px;font-weight:800;color:var(--sub);
+  text-transform:uppercase;letter-spacing:1px;
+  border-bottom:1px solid var(--border);
+  background:var(--surface2);white-space:nowrap;
+}
+.data-table td{padding:14px 16px;border-bottom:1px solid var(--border);font-size:13px;font-weight:500;vertical-align:middle;}
 .data-table tr:last-child td{border-bottom:none;}
-.data-table tr:hover td{background:#f9fafb;}
+.data-table tr:hover td{background:var(--surface2);}
 
 /* RISK BADGES */
-.risk{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:700;}
-.risk.high{background:#fef2f2;color:var(--red);}
-.risk.medium{background:#fffbeb;color:var(--yellow);}
-.risk.low{background:#f0fdf4;color:var(--green);}
-.flag-chip{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;margin:2px;}
-.flag-chip.cancel{background:#fef2f2;color:var(--red);}
-.flag-chip.stores{background:#eff6ff;color:var(--blue);}
-.flag-chip.return{background:#faf5ff;color:var(--purple);}
+.risk{display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:20px;font-size:12px;font-weight:800;letter-spacing:.3px;}
+.risk.high{background:var(--red-soft);color:var(--red);border:1px solid rgba(255,79,107,.2);}
+.risk.medium{background:var(--yellow-soft);color:var(--yellow);border:1px solid rgba(255,184,79,.2);}
+.risk.safe{background:var(--green-soft);color:var(--green);border:1px solid rgba(0,212,138,.2);}
 
-/* STATUS */
-.status{display:inline-block;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:600;}
-.status.paid{background:#f0fdf4;color:var(--green);}
-.status.pending{background:#fffbeb;color:var(--yellow);}
-.status.voided{background:#f9fafb;color:var(--sub);}
-.status.refunded{background:#fef2f2;color:var(--red);}
-.status.cancelled{background:#f9fafb;color:var(--sub);}
+/* STATUS BADGES */
+.status{display:inline-block;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700;}
+.status.paid{background:var(--green-soft);color:var(--green);}
+.status.pending{background:var(--yellow-soft);color:var(--yellow);}
+.status.voided{background:var(--surface2);color:var(--sub);}
+.status.refunded{background:var(--red-soft);color:var(--red);}
+.status.unfulfilled{background:var(--yellow-soft);color:var(--yellow);}
+.status.fulfilled{background:var(--green-soft);color:var(--green);}
+
+/* FLAG CHIPS */
+.flag{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:6px;font-size:11px;font-weight:800;margin:2px;}
+.flag.red{background:var(--red-soft);color:var(--red);}
+.flag.blue{background:var(--blue-soft);color:var(--blue);}
+.flag.purple{background:var(--purple-soft);color:var(--purple);}
+.flag.yellow{background:var(--yellow-soft);color:var(--yellow);}
 
 /* BUTTONS */
-.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:7px;border:1px solid transparent;font-size:13px;font-weight:600;cursor:pointer;transition:.15s;}
-.btn-primary{background:var(--blue);color:#fff;border-color:var(--blue);}
-.btn-primary:hover{background:#1d4ed8;}
-.btn-outline{background:#fff;color:var(--text);border-color:var(--border);}
-.btn-outline:hover{background:#f9fafb;}
-.btn-sm{padding:5px 12px;font-size:12px;}
-button:disabled{opacity:.5;cursor:not-allowed;}
+.btn{display:inline-flex;align-items:center;gap:7px;padding:9px 18px;border-radius:9px;border:none;font-size:13px;font-weight:700;cursor:pointer;transition:all .2s;font-family:'Inter',sans-serif;letter-spacing:.1px;}
+.btn-primary{background:linear-gradient(135deg,#4f7cff,#a855f7);color:#fff;box-shadow:0 2px 16px rgba(79,124,255,.35);}
+.btn-primary:hover{box-shadow:0 4px 24px rgba(79,124,255,.5);transform:translateY(-1px);}
+.btn-outline{background:var(--surface2);color:var(--text);border:1px solid var(--border);}
+.btn-outline:hover{border-color:var(--blue);color:var(--blue);}
+.btn-danger{background:linear-gradient(135deg,#ff4f6b,#ff8c4f);color:#fff;box-shadow:0 2px 16px rgba(255,79,107,.3);}
+.btn-sm{padding:6px 14px;font-size:12px;}
+button:disabled{opacity:.4;cursor:not-allowed;transform:none!important;}
 
-/* OFFENDER ROW */
+/* PROGRESS BARS */
+.prog-wrap{background:var(--surface2);border-radius:6px;height:7px;overflow:hidden;}
+.prog-fill{height:100%;border-radius:6px;transition:width .6s ease;}
+.prog-fill.blue{background:linear-gradient(90deg,#4f7cff,#a855f7);}
+.prog-fill.red{background:linear-gradient(90deg,#ff4f6b,#ffb84f);}
+.prog-fill.green{background:linear-gradient(90deg,#00d48a,#4f7cff);}
+
+/* OFFENDER CARD */
 .offender-row{display:flex;align-items:center;gap:14px;padding:14px 0;border-bottom:1px solid var(--border);}
 .offender-row:last-child{border-bottom:none;}
-.offender-avatar{width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#6366f1,#ec4899);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:14px;flex-shrink:0;}
-.offender-info{flex:1;}
-.offender-name{font-weight:600;font-size:13px;}
-.offender-meta{font-size:12px;color:var(--sub);margin-top:2px;}
-.offender-stats{text-align:right;}
-.offender-val{font-weight:700;font-size:13px;}
-.offender-sub{font-size:11px;color:var(--sub);}
+.offender-avatar{
+  width:42px;height:42px;border-radius:12px;flex-shrink:0;
+  background:linear-gradient(135deg,#4f7cff,#a855f7);
+  display:flex;align-items:center;justify-content:center;
+  color:#fff;font-weight:900;font-size:16px;
+  box-shadow:0 4px 12px rgba(79,124,255,.3);
+}
+.offender-name{font-weight:800;font-size:14px;margin-bottom:2px;}
+.offender-meta{font-size:12px;color:var(--sub);font-weight:500;}
+.offender-stats{text-align:right;flex-shrink:0;}
+.offender-pct{font-weight:900;font-size:15px;}
 
-/* PROGRESS */
-.prog-wrap{background:#e5e7eb;border-radius:4px;height:6px;overflow:hidden;margin-top:4px;}
-.prog-fill{height:100%;border-radius:4px;background:var(--red);}
-.prog-fill.yellow{background:var(--yellow);}
-.prog-fill.blue{background:var(--blue);}
+/* TWO COL */
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
+@media(max-width:1000px){.two-col{grid-template-columns:1fr;}}
 
-/* GRID */
-.two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
-@media(max-width:900px){.two-col{grid-template-columns:1fr;}}
-
-/* SPINNER / EMPTY */
-.spinner{display:inline-block;width:18px;height:18px;border:2px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite;}
+/* SPINNER */
+.spinner{display:inline-block;width:20px;height:20px;border:2px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite;}
 @keyframes spin{to{transform:rotate(360deg);}}
-.empty{text-align:center;padding:50px 20px;color:var(--sub);}
-.empty-icon{font-size:40px;margin-bottom:12px;}
-.empty h3{font-size:16px;font-weight:600;color:var(--text);margin-bottom:6px;}
+
+/* EMPTY STATE */
+.empty{text-align:center;padding:60px 20px;color:var(--sub);}
+.empty-icon{font-size:48px;margin-bottom:16px;display:block;}
+.empty h3{font-size:18px;font-weight:800;color:var(--text);margin-bottom:8px;}
+.empty p{font-size:13px;font-weight:500;}
 
 /* TOAST */
-#toasts{position:fixed;bottom:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:8px;}
-.toast{padding:12px 18px;border-radius:8px;color:#fff;font-size:13px;font-weight:500;min-width:240px;animation:toastIn .2s ease;}
-.toast.success{background:var(--green);}
-.toast.error{background:var(--red);}
-.toast.info{background:var(--blue);}
-@keyframes toastIn{from{transform:translateX(30px);opacity:0;}to{transform:none;opacity:1;}}
+#toasts{position:fixed;bottom:24px;right:24px;z-index:9999;display:flex;flex-direction:column;gap:10px;}
+.toast{
+  padding:14px 20px;border-radius:12px;color:#fff;font-size:13px;font-weight:700;
+  min-width:260px;animation:toastIn .25s ease;border:1px solid;
+  display:flex;align-items:center;gap:10px;
+  box-shadow:0 8px 32px rgba(0,0,0,.4);
+}
+.toast.success{background:#0a2e22;border-color:var(--green);color:var(--green);}
+.toast.error{background:#2e0a14;border-color:var(--red);color:var(--red);}
+.toast.info{background:var(--blue-soft);border-color:var(--blue);color:var(--blue);}
+@keyframes toastIn{from{transform:translateX(40px);opacity:0;}to{transform:none;opacity:1;}}
 
 /* MODAL */
-.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;align-items:center;justify-content:center;}
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1000;align-items:center;justify-content:center;backdrop-filter:blur(4px);}
 .overlay.open{display:flex;}
-.modal{background:#fff;border-radius:12px;width:520px;max-width:95vw;max-height:90vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.2);}
-.modal-head{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
-.modal-title{font-size:16px;font-weight:700;}
-.modal-close{background:none;border:none;font-size:22px;cursor:pointer;color:var(--sub);line-height:1;}
-.modal-body{padding:20px;}
-.modal-foot{padding:14px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px;}
-.form-group{margin-bottom:14px;}
-.form-label{display:block;font-size:12px;font-weight:600;margin-bottom:5px;color:var(--sub);}
-.form-control{width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:7px;font-size:13px;}
-.form-control:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(37,99,235,.1);}
-.li-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:18px;width:540px;max-width:95vw;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.6);}
+.modal-head{padding:20px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.modal-title{font-size:18px;font-weight:900;letter-spacing:-.3px;}
+.modal-close{background:var(--surface2);border:1px solid var(--border);width:32px;height:32px;border-radius:8px;cursor:pointer;color:var(--sub);font-size:18px;display:flex;align-items:center;justify-content:center;transition:.2s;}
+.modal-close:hover{color:var(--text);border-color:var(--blue);}
+.modal-body{padding:24px;}
+.modal-foot{padding:18px 24px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px;}
+
+/* FORM */
+.form-group{margin-bottom:16px;}
+.form-label{display:block;font-size:12px;font-weight:800;color:var(--sub);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px;}
+.form-control{
+  width:100%;padding:10px 14px;
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:9px;font-size:13px;font-weight:500;
+  color:var(--text);font-family:'Inter',sans-serif;transition:.2s;
+}
+.form-control:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(79,124,255,.15);}
+select.form-control option{background:var(--surface2);}
+
+/* LINE ITEMS */
+.li-row{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);}
 .li-row:last-child{border-bottom:none;}
-.li-title{font-weight:500;flex:1;}
-.li-price{font-size:12px;color:var(--sub);}
-.qty-inp{width:56px;padding:4px 8px;border:1px solid var(--border);border-radius:5px;text-align:center;}
+.li-check{width:18px;height:18px;cursor:pointer;accent-color:var(--blue);}
+.li-info{flex:1;}
+.li-title{font-weight:700;font-size:13px;}
+.li-price{font-size:12px;color:var(--sub);margin-top:2px;}
+.qty-inp{width:60px;padding:6px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:7px;text-align:center;color:var(--text);font-family:'Inter',sans-serif;font-weight:700;}
+
+/* DIVIDER */
+.divider{height:1px;background:var(--border);margin:20px 0;}
+
+/* GLOW EFFECT */
+.glow-blue{box-shadow:0 0 20px rgba(79,124,255,.2);}
+.glow-red{box-shadow:0 0 20px rgba(255,79,107,.2);}
 </style>
 </head>
 <body>
@@ -162,78 +279,91 @@ button:disabled{opacity:.5;cursor:not-allowed;}
 <div class="topbar">
   <div class="topbar-logo">SRF</div>
   <div class="topbar-title">Smart Return Furor</div>
-  <div class="topbar-store" id="store-name">Loading...</div>
+  <div class="topbar-badge">PRO</div>
+  <div class="topbar-store" id="store-name">Connecting...</div>
 </div>
 
 <div class="layout">
+
 <!-- SIDEBAR -->
 <div class="sidebar">
-  <div class="sidebar-label">Main</div>
-  <div class="nav-item active" data-page="dashboard"><span class="icon">📊</span> Dashboard</div>
-  <div class="nav-item" data-page="flagged"><span class="icon">🚨</span> Flagged Orders <span class="badge-count" id="flag-count">0</span></div>
-  <div class="nav-item" data-page="customers"><span class="icon">👥</span> Customers</div>
-  <div class="nav-item" data-page="orders"><span class="icon">📦</span> All Orders</div>
-  <div class="sidebar-label" style="margin-top:8px">Analytics</div>
-  <div class="nav-item" data-page="analytics"><span class="icon">📈</span> Analytics</div>
-  <div class="nav-item" data-page="returns"><span class="icon">↩️</span> Returns</div>
-  <div class="sidebar-label" style="margin-top:8px">Settings</div>
-  <div class="nav-item" data-page="rules"><span class="icon">⚙️</span> Risk Rules</div>
-</div>
-
-<!-- MAIN -->
-<div class="main">
-
-<!-- DASHBOARD -->
-<div id="page-dashboard" class="page active">
-  <div class="page-title">Performance Overview</div>
-  <div class="page-sub" id="dash-sub">Tracking risk metrics for your store</div>
-
-  <!-- Webhook status -->
-  <div id="webhook-status" class="alert info" style="margin-bottom:16px">
-    <div class="alert-icon">🔗</div>
-    <div class="alert-text">
-      <strong id="wh-title">Checking auto-tag webhook...</strong>
-      <span id="wh-body">Verifying real-time order monitoring is active</span>
-    </div>
+  <div class="sidebar-section">Main</div>
+  <div class="nav-item active" data-page="dashboard">
+    <span class="material-symbols-rounded icon">dashboard</span> Dashboard
+  </div>
+  <div class="nav-item" data-page="flagged">
+    <span class="material-symbols-rounded icon">flag</span> Flagged Orders
+    <span class="nav-badge" id="flag-count">0</span>
+  </div>
+  <div class="nav-item" data-page="customers">
+    <span class="material-symbols-rounded icon">group</span> Risk Customers
+  </div>
+  <div class="nav-item" data-page="orders">
+    <span class="material-symbols-rounded icon">package_2</span> All Orders
   </div>
 
+  <div class="sidebar-section">Analytics</div>
+  <div class="nav-item" data-page="analytics">
+    <span class="material-symbols-rounded icon">bar_chart</span> Analytics
+  </div>
+  <div class="nav-item" data-page="returns">
+    <span class="material-symbols-rounded icon">assignment_return</span> Returns
+  </div>
+
+  <div class="sidebar-section">Config</div>
+  <div class="nav-item" data-page="rules">
+    <span class="material-symbols-rounded icon">tune</span> Risk Rules
+  </div>
+</div>
+
+<!-- MAIN CONTENT -->
+<div class="main">
+
+<!-- ── DASHBOARD ── -->
+<div id="page-dashboard" class="page active">
+  <div class="page-header">
+    <div class="page-title">Performance Overview</div>
+    <div class="page-sub">Real-time return risk intelligence for your store</div>
+  </div>
+
+  <div id="webhook-alert"></div>
+
   <div class="stat-row">
-    <div class="stat-card">
+    <div class="stat-card blue">
+      <div class="stat-icon blue"><span class="material-symbols-rounded">shopping_bag</span></div>
       <div class="stat-label">Total Analyzed</div>
-      <div class="stat-value" id="d-total">—</div>
-      <div class="stat-desc">Orders last 90 days</div>
+      <div class="stat-value" id="d-total"><span class="spinner"></span></div>
+      <div class="stat-desc">Orders in last 90 days</div>
     </div>
-    <div class="stat-card">
+    <div class="stat-card red">
+      <div class="stat-icon red"><span class="material-symbols-rounded">assignment_return</span></div>
       <div class="stat-label">Total Returns</div>
-      <div class="stat-value" style="color:var(--red)" id="d-returns">—</div>
+      <div class="stat-value" id="d-returns">—</div>
       <div class="stat-desc">Refunded orders</div>
     </div>
-    <div class="stat-card">
+    <div class="stat-card yellow">
+      <div class="stat-icon yellow"><span class="material-symbols-rounded">percent</span></div>
       <div class="stat-label">Return Rate</div>
-      <div class="stat-value" style="color:var(--yellow)" id="d-rate">—</div>
+      <div class="stat-value" id="d-rate">—</div>
       <div class="stat-desc">% of total orders</div>
-      <div class="stat-change up" id="d-rate-change"></div>
     </div>
-    <div class="stat-card">
+    <div class="stat-card purple">
+      <div class="stat-icon purple"><span class="material-symbols-rounded">currency_exchange</span></div>
       <div class="stat-label">Estimated Loss</div>
-      <div class="stat-value" style="color:var(--red)" id="d-loss">—</div>
+      <div class="stat-value" id="d-loss">—</div>
       <div class="stat-desc">Total refunded value</div>
     </div>
   </div>
 
-  <!-- Performance insight -->
-  <div class="alert info" id="perf-insight" style="display:none">
-    <div class="alert-icon">ℹ️</div>
-    <div class="alert-text">
-      <strong id="insight-title">Performance Insight</strong>
-      <span id="insight-body"></span>
-    </div>
+  <div id="perf-insight" style="display:none" class="alert info">
+    <div class="alert-icon">💡</div>
+    <div><strong id="insight-title"></strong><span id="insight-body"></span></div>
   </div>
 
   <div class="two-col">
     <div class="card">
       <div class="card-head">
-        <span class="card-title">Repeat Offender Spotlight</span>
+        <div class="card-title"><span class="material-symbols-rounded" style="color:var(--red)">person_alert</span> Repeat Offenders</div>
         <button class="btn btn-outline btn-sm" onclick="navTo('customers')">View All</button>
       </div>
       <div class="card-body" id="offender-list">
@@ -241,7 +371,9 @@ button:disabled{opacity:.5;cursor:not-allowed;}
       </div>
     </div>
     <div class="card">
-      <div class="card-head"><span class="card-title">Return Reasons</span></div>
+      <div class="card-head">
+        <div class="card-title"><span class="material-symbols-rounded" style="color:var(--blue)">donut_large</span> Return Reasons</div>
+      </div>
       <div class="card-body" id="dash-reasons">
         <div class="empty"><span class="spinner"></span></div>
       </div>
@@ -250,161 +382,191 @@ button:disabled{opacity:.5;cursor:not-allowed;}
 
   <div class="card">
     <div class="card-head">
-      <span class="card-title">Recent Flagged Orders</span>
-      <button class="btn btn-outline btn-sm" onclick="navTo('flagged')">View All Flagged</button>
+      <div class="card-title"><span class="material-symbols-rounded" style="color:var(--yellow)">warning</span> Recent Flagged Orders</div>
+      <button class="btn btn-outline btn-sm" onclick="navTo('flagged')">View All</button>
     </div>
     <div style="overflow-x:auto">
       <table class="data-table">
-        <thead><tr><th>Order</th><th>Customer</th><th>Value</th><th>Status</th><th>Risk</th><th>Flags</th></tr></thead>
-        <tbody id="dash-orders"><tr><td colspan="6"><div class="empty"><span class="spinner"></span></div></td></tr></tbody>
+        <thead><tr><th>Order</th><th>Total</th><th>Status</th><th>Risk</th><th>Flag</th></tr></thead>
+        <tbody id="dash-orders"><tr><td colspan="5"><div class="empty" style="padding:30px 0"><span class="spinner"></span></div></td></tr></tbody>
       </table>
     </div>
   </div>
 </div>
 
-<!-- FLAGGED ORDERS -->
+<!-- ── FLAGGED ORDERS ── -->
 <div id="page-flagged" class="page">
-  <div class="page-title">Flagged Orders</div>
-  <div class="page-sub">Orders identified as risky based on customer history</div>
+  <div class="page-header">
+    <div class="page-title">🚨 Flagged Orders</div>
+    <div class="page-sub">Orders identified as risky based on 90-day customer history</div>
+  </div>
 
   <div class="stat-row" style="grid-template-columns:repeat(3,1fr)">
-    <div class="stat-card"><div class="stat-label">Risky Customers</div><div class="stat-value" style="color:var(--red)" id="f-risky">—</div><div class="stat-desc">Orders from High/Medium risk profiles</div></div>
-    <div class="stat-card"><div class="stat-label">Cancelled / Returned</div><div class="stat-value" style="color:var(--yellow)" id="f-cancelled">—</div><div class="stat-desc">Orders lost to cancellation or RTO</div></div>
-    <div class="stat-card"><div class="stat-label">High Risk</div><div class="stat-value" style="color:var(--red)" id="f-high">—</div><div class="stat-desc">Customers with 2+ bad orders</div></div>
-  </div>
-
-  <div class="alert warning" id="scan-alert" style="display:none">
-    <div class="alert-icon">⚠️</div>
-    <div class="alert-text">
-      <strong>Scan Required</strong>
-      <span>Run a scan to detect risky customers and tag orders automatically.</span>
+    <div class="stat-card red">
+      <div class="stat-icon red"><span class="material-symbols-rounded">dangerous</span></div>
+      <div class="stat-label">Risky Customers</div>
+      <div class="stat-value" id="f-risky">—</div>
+      <div class="stat-desc">High + Medium risk profiles</div>
+    </div>
+    <div class="stat-card yellow">
+      <div class="stat-icon yellow"><span class="material-symbols-rounded">cancel</span></div>
+      <div class="stat-label">Cancelled / Returned</div>
+      <div class="stat-value" id="f-cancelled">—</div>
+      <div class="stat-desc">Orders lost to RTO</div>
+    </div>
+    <div class="stat-card purple">
+      <div class="stat-icon purple"><span class="material-symbols-rounded">shield_person</span></div>
+      <div class="stat-label">High Risk</div>
+      <div class="stat-value" id="f-high">—</div>
+      <div class="stat-desc">2+ bad orders in 90 days</div>
     </div>
   </div>
 
   <div class="card">
-    <div class="card-head">
+    <div class="card-head" style="flex-wrap:wrap;gap:12px">
       <div class="tab-bar">
-        <button class="tab-btn active" data-filter="all">All Flagged <span class="tab-count" id="tab-all">0</span></button>
-        <button class="tab-btn" data-filter="high">Risky <span class="tab-count" id="tab-high">0</span></button>
-        <button class="tab-btn" data-filter="cancelled">Cancelled/Returned <span class="tab-count" id="tab-cancel">0</span></button>
+        <button class="tab-btn active" data-filter="all">All <span class="tab-count" id="tab-all">0</span></button>
+        <button class="tab-btn" data-filter="high">🔴 High Risk <span class="tab-count" id="tab-high">0</span></button>
+        <button class="tab-btn" data-filter="cancelled">Cancelled <span class="tab-count" id="tab-cancel">0</span></button>
       </div>
-      <button class="btn btn-primary btn-sm" id="scan-btn" onclick="runScan()">🔍 Scan & Tag</button>
+      <button class="btn btn-primary" id="scan-btn" onclick="runScan()">
+        <span class="material-symbols-rounded">radar</span> Scan & Auto-Tag
+      </button>
     </div>
     <div style="overflow-x:auto">
       <table class="data-table">
-        <thead><tr><th>Order</th><th>Date</th><th>Customer</th><th>Value</th><th>Payment</th><th>Fulfillment</th><th>Risk</th><th>Flags</th><th></th></tr></thead>
-        <tbody id="flagged-tbody"><tr><td colspan="9"><div class="empty"><div class="empty-icon">🔍</div><h3>Run a scan first</h3><p>Click "Scan & Tag" to detect risky orders</p></div></td></tr></tbody>
+        <thead><tr><th>Bad Orders</th><th>Customer</th><th>Total Orders</th><th>Voided</th><th>Returned</th><th>Risk Level</th><th>Flags</th></tr></thead>
+        <tbody id="flagged-tbody">
+          <tr><td colspan="7"><div class="empty"><span class="empty-icon">🔍</span><h3>Run a scan first</h3><p>Click "Scan & Auto-Tag" to detect risky customers</p></div></td></tr>
+        </tbody>
       </table>
     </div>
-    <div id="scan-progress" style="display:none;padding:16px 18px;border-top:1px solid var(--border);font-size:13px;color:var(--sub)"></div>
+    <div id="scan-progress" style="display:none;padding:14px 20px;border-top:1px solid var(--border);font-size:13px;font-weight:600;color:var(--sub)"></div>
   </div>
 </div>
 
-<!-- CUSTOMERS -->
+<!-- ── CUSTOMERS ── -->
 <div id="page-customers" class="page">
-  <div class="page-title">Risky Customers</div>
-  <div class="page-sub">Customers tagged as high-risk or medium-risk based on 90-day order history</div>
+  <div class="page-header">
+    <div class="page-title">👥 Risk Customers</div>
+    <div class="page-sub">Customers auto-tagged based on 90-day return & void history</div>
+  </div>
   <div class="card">
     <div class="card-head">
-      <span class="card-title">Customer Risk List</span>
-      <button class="btn btn-outline btn-sm" onclick="loadRiskyCustomers()">↻ Refresh</button>
+      <div class="card-title"><span class="material-symbols-rounded" style="color:var(--red)">person_alert</span> Customer Risk List</div>
+      <button class="btn btn-outline btn-sm" onclick="loadRiskyCustomers()">
+        <span class="material-symbols-rounded">refresh</span> Refresh
+      </button>
     </div>
     <div style="overflow-x:auto">
       <table class="data-table">
-        <thead><tr><th>Customer</th><th>Email</th><th>Orders</th><th>Total Spent</th><th>Voided</th><th>Returned</th><th>Cancel %</th><th>Risk Profile</th><th>Status</th></tr></thead>
-        <tbody id="customers-tbody"><tr><td colspan="9"><div class="empty"><span class="spinner"></span></div></td></tr></tbody>
+        <thead><tr><th>Customer</th><th>Orders</th><th>Total Spent</th><th>Tags</th><th>Risk Profile</th></tr></thead>
+        <tbody id="customers-tbody"><tr><td colspan="5"><div class="empty" style="padding:40px 0"><span class="spinner"></span></div></td></tr></tbody>
       </table>
     </div>
   </div>
 </div>
 
-<!-- ALL ORDERS -->
+<!-- ── ALL ORDERS ── -->
 <div id="page-orders" class="page">
-  <div class="page-title">All Orders</div>
-  <div class="page-sub">Complete order list with risk indicators</div>
-  <div style="display:flex;gap:10px;margin-bottom:14px">
-    <input class="form-control" style="max-width:240px" id="order-search" placeholder="Search order #..." oninput="filterOrders()">
-    <select class="form-control" style="max-width:160px" id="order-filter" onchange="filterOrders()">
+  <div class="page-header">
+    <div class="page-title">📦 All Orders</div>
+    <div class="page-sub">Complete order list with risk indicators</div>
+  </div>
+  <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap">
+    <input class="form-control" style="max-width:260px" id="order-search" placeholder="🔍  Search order #..." oninput="filterOrders()">
+    <select class="form-control" style="max-width:180px" id="order-filter" onchange="filterOrders()">
       <option value="">All statuses</option>
       <option value="paid">Paid</option>
       <option value="refunded">Refunded</option>
       <option value="voided">Voided</option>
       <option value="pending">Pending</option>
     </select>
-    <button class="btn btn-outline btn-sm" onclick="loadOrders()">↻ Reload</button>
+    <button class="btn btn-outline btn-sm" onclick="loadOrders()">
+      <span class="material-symbols-rounded">refresh</span> Reload
+    </button>
   </div>
   <div class="card">
     <div style="overflow-x:auto">
       <table class="data-table">
         <thead><tr><th>Order</th><th>Date</th><th>Total</th><th>Payment</th><th>Fulfillment</th><th>Risk</th><th>Action</th></tr></thead>
-        <tbody id="orders-tbody"><tr><td colspan="7"><div class="empty"><span class="spinner"></span></div></td></tr></tbody>
+        <tbody id="orders-tbody"><tr><td colspan="7"><div class="empty" style="padding:40px 0"><span class="spinner"></span></div></td></tr></tbody>
       </table>
     </div>
   </div>
 </div>
 
-<!-- ANALYTICS -->
+<!-- ── ANALYTICS ── -->
 <div id="page-analytics" class="page">
-  <div class="page-title">Analytics</div>
-  <div class="page-sub">90-day return and risk performance metrics</div>
+  <div class="page-header">
+    <div class="page-title">📈 Analytics</div>
+    <div class="page-sub">90-day return and risk performance metrics</div>
+  </div>
   <div class="stat-row">
-    <div class="stat-card"><div class="stat-label">Total Orders</div><div class="stat-value" id="a-orders">—</div></div>
-    <div class="stat-card"><div class="stat-label">Returns Filed</div><div class="stat-value" style="color:var(--red)" id="a-returns">—</div></div>
-    <div class="stat-card"><div class="stat-label">Return Rate</div><div class="stat-value" style="color:var(--yellow)" id="a-rate">—</div></div>
-    <div class="stat-card"><div class="stat-label">$ Refunded</div><div class="stat-value" style="color:var(--red)" id="a-amount">—</div></div>
+    <div class="stat-card blue"><div class="stat-icon blue"><span class="material-symbols-rounded">inventory_2</span></div><div class="stat-label">Total Orders</div><div class="stat-value" id="a-orders">—</div></div>
+    <div class="stat-card red"><div class="stat-icon red"><span class="material-symbols-rounded">keyboard_return</span></div><div class="stat-label">Returns Filed</div><div class="stat-value" id="a-returns">—</div></div>
+    <div class="stat-card yellow"><div class="stat-icon yellow"><span class="material-symbols-rounded">trending_up</span></div><div class="stat-label">Return Rate</div><div class="stat-value" id="a-rate">—</div></div>
+    <div class="stat-card green"><div class="stat-icon green"><span class="material-symbols-rounded">payments</span></div><div class="stat-label">$ Refunded</div><div class="stat-value" id="a-amount">—</div></div>
   </div>
   <div class="two-col">
     <div class="card">
-      <div class="card-head"><span class="card-title">Most Returned Products</span></div>
-      <div class="card-body" id="a-products"><div class="empty"><span class="spinner"></span></div></div>
+      <div class="card-head"><div class="card-title"><span class="material-symbols-rounded" style="color:var(--red)">inventory</span> Most Returned Products</div></div>
+      <div class="card-body" id="a-products"><div class="empty" style="padding:20px 0"><span class="spinner"></span></div></div>
     </div>
     <div class="card">
-      <div class="card-head"><span class="card-title">Return Reason Breakdown</span></div>
-      <div class="card-body" id="a-reasons"><div class="empty"><span class="spinner"></span></div></div>
+      <div class="card-head"><div class="card-title"><span class="material-symbols-rounded" style="color:var(--blue)">analytics</span> Return Reasons</div></div>
+      <div class="card-body" id="a-reasons"><div class="empty" style="padding:20px 0"><span class="spinner"></span></div></div>
     </div>
   </div>
 </div>
 
-<!-- RETURNS -->
+<!-- ── RETURNS ── -->
 <div id="page-returns" class="page">
-  <div class="page-title">Create Return</div>
-  <div class="page-sub">Select an order from All Orders to initiate a return</div>
-  <div class="card">
-    <div class="card-body">
-      <div class="empty">
-        <div class="empty-icon">↩️</div>
-        <h3>Select an order</h3>
-        <p>Go to <strong>All Orders</strong> and click the Return button on any order</p>
-        <button class="btn btn-primary" style="margin-top:16px" onclick="navTo('orders')">Go to Orders</button>
-      </div>
-    </div>
+  <div class="page-header">
+    <div class="page-title">↩️ Create Return</div>
+    <div class="page-sub">Select an order from All Orders to initiate a return</div>
   </div>
+  <div class="card"><div class="card-body">
+    <div class="empty">
+      <span class="empty-icon">📦</span>
+      <h3>Select an Order</h3>
+      <p>Go to All Orders and click the Return button</p>
+      <button class="btn btn-primary" style="margin-top:20px" onclick="navTo('orders')">
+        <span class="material-symbols-rounded">open_in_new</span> Go to Orders
+      </button>
+    </div>
+  </div></div>
 </div>
 
-<!-- RISK RULES -->
+<!-- ── RISK RULES ── -->
 <div id="page-rules" class="page">
-  <div class="page-title">Risk Rules</div>
-  <div class="page-sub">Configure thresholds for automatic risk classification</div>
+  <div class="page-header">
+    <div class="page-title">⚙️ Risk Rules</div>
+    <div class="page-sub">Configure thresholds for automatic risk classification</div>
+  </div>
   <div class="card">
-    <div class="card-head"><span class="card-title">Risk Thresholds</span></div>
+    <div class="card-head"><div class="card-title"><span class="material-symbols-rounded" style="color:var(--red)">rule</span> Risk Thresholds</div></div>
     <div class="card-body">
       <div class="form-group">
-        <label class="form-label">HIGH RISK threshold — flag customer after this many bad orders in 90 days</label>
-        <input type="number" class="form-control" id="rule-high" value="2" min="1" max="10" style="max-width:100px">
+        <label class="form-label">🔴 High Risk — flag after X bad orders in 90 days</label>
+        <input type="number" class="form-control" id="rule-high" value="2" min="1" max="10" style="max-width:120px">
       </div>
       <div class="form-group">
-        <label class="form-label">MEDIUM RISK threshold — flag customer after this many bad orders in 90 days</label>
-        <input type="number" class="form-control" id="rule-medium" value="1" min="1" max="10" style="max-width:100px">
+        <label class="form-label">🟡 Medium Risk — flag after X bad orders in 90 days</label>
+        <input type="number" class="form-control" id="rule-medium" value="1" min="1" max="10" style="max-width:120px">
+      </div>
+      <div class="divider"></div>
+      <div class="form-group">
+        <label class="form-label">High Risk Order Tag</label>
+        <input type="text" class="form-control" id="rule-tag-high" value="Smart Returns - High Risk Order" style="max-width:400px">
       </div>
       <div class="form-group">
-        <label class="form-label">Order tag for HIGH RISK new orders</label>
-        <input type="text" class="form-control" id="rule-tag-high" value="Smart Returns - High Risk Order" style="max-width:360px">
+        <label class="form-label">Medium Risk Order Tag</label>
+        <input type="text" class="form-control" id="rule-tag-medium" value="Smart Returns - Medium Risk Order" style="max-width:400px">
       </div>
-      <div class="form-group">
-        <label class="form-label">Order tag for MEDIUM RISK new orders</label>
-        <input type="text" class="form-control" id="rule-tag-medium" value="Smart Returns - Medium Risk Order" style="max-width:360px">
-      </div>
-      <button class="btn btn-primary" onclick="saveRules()">💾 Save Rules</button>
+      <button class="btn btn-primary" onclick="saveRules()">
+        <span class="material-symbols-rounded">save</span> Save Rules
+      </button>
     </div>
   </div>
 </div>
@@ -416,13 +578,14 @@ button:disabled{opacity:.5;cursor:not-allowed;}
 <div class="overlay" id="return-modal">
   <div class="modal">
     <div class="modal-head">
-      <span class="modal-title">Create Return / Refund</span>
-      <button class="modal-close" onclick="closeModal()">×</button>
+      <div class="modal-title">↩️ Create Return / Refund</div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
     </div>
     <div class="modal-body">
-      <p style="color:var(--sub);font-size:13px;margin-bottom:14px">Select items to include in the return:</p>
+      <p style="color:var(--sub);font-size:13px;font-weight:500;margin-bottom:16px">Select items to include in the return:</p>
       <div id="modal-items"></div>
-      <div class="form-group" style="margin-top:14px">
+      <div class="divider"></div>
+      <div class="form-group">
         <label class="form-label">Return Reason</label>
         <select class="form-control" id="ret-reason">
           <option>Customer changed mind</option>
@@ -437,13 +600,16 @@ button:disabled{opacity:.5;cursor:not-allowed;}
         <label class="form-label">Notes (optional)</label>
         <input type="text" class="form-control" id="ret-notes" placeholder="Additional notes...">
       </div>
-      <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
-        <input type="checkbox" id="ret-notify" checked> Notify customer by email
+      <label style="display:flex;align-items:center;gap:10px;font-size:13px;font-weight:600;cursor:pointer;color:var(--sub)">
+        <input type="checkbox" id="ret-notify" checked style="width:16px;height:16px;accent-color:var(--blue)">
+        Notify customer by email
       </label>
     </div>
     <div class="modal-foot">
       <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-primary" id="ret-btn" onclick="submitReturn()" style="background:var(--red);border-color:var(--red)">Create Return</button>
+      <button class="btn btn-danger" id="ret-btn" onclick="submitReturn()">
+        <span class="material-symbols-rounded">assignment_return</span> Create Return
+      </button>
     </div>
   </div>
 </div>
@@ -463,11 +629,12 @@ function navTo(page) {
   document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === `page-${page}`));
   if (page === 'analytics') loadAnalytics();
   if (page === 'customers') loadRiskyCustomers();
-  if (page === 'flagged' && !scanResults.length) document.getElementById('scan-alert').style.display = 'flex';
+  if (page === 'flagged' && !scanResults.length) {
+    document.getElementById('scan-progress').style.display = 'block';
+    document.getElementById('scan-progress').textContent = '👆 Click "Scan & Auto-Tag" to detect risky customers based on 90-day history';
+  }
 }
 document.querySelectorAll('.nav-item').forEach(n => n.addEventListener('click', () => navTo(n.dataset.page)));
-
-// ── Tab filter ──
 document.querySelectorAll('.tab-btn').forEach(b => {
   b.addEventListener('click', () => {
     document.querySelectorAll('.tab-btn').forEach(x => x.classList.remove('active'));
@@ -479,11 +646,12 @@ document.querySelectorAll('.tab-btn').forEach(b => {
 
 // ── Toast ──
 function toast(msg, type = 'info') {
+  const icons = { success: '✅', error: '❌', info: 'ℹ️' };
   const el = document.createElement('div');
   el.className = `toast ${type}`;
-  el.textContent = msg;
+  el.innerHTML = `<span>${icons[type]}</span><span>${msg}</span>`;
   document.getElementById('toasts').appendChild(el);
-  setTimeout(() => el.remove(), 3500);
+  setTimeout(() => el.remove(), 4000);
 }
 
 // ── API ──
@@ -493,87 +661,58 @@ async function api(path, opts = {}) {
   return r.json();
 }
 
-// ── Risk helpers ──
-function getRiskFromTags(tags = '') {
-  if (!tags) return null;
-  const t = tags.toLowerCase();
-  if (t.includes('high-risk')) return 'high';
-  if (t.includes('medium-risk')) return 'medium';
-  return null;
-}
+// ── Badges ──
 function riskBadge(level) {
-  if (!level) return '<span class="risk low">✅ Safe</span>';
+  if (!level) return '<span class="risk safe">✅ Safe</span>';
   if (level === 'high-risk' || level === 'high') return '<span class="risk high">🔴 High Risk</span>';
   if (level === 'medium-risk' || level === 'medium') return '<span class="risk medium">🟡 Medium Risk</span>';
-  return '<span class="risk low">✅ Safe</span>';
+  return '<span class="risk safe">✅ Safe</span>';
 }
 function statusBadge(s) {
-  const v = (s||'').toLowerCase().replace(/\s/g,'');
-  return `<span class="status ${v}">${s||'Unknown'}</span>`;
-}
-function flagChips(c) {
-  if (!c) return '';
-  const chips = [];
-  if (c.voidedCount > 0) chips.push(`<span class="flag-chip cancel">${c.voidedCount} Voided</span>`);
-  if (c.refundedCount > 0) chips.push(`<span class="flag-chip return">${c.refundedCount} Returned</span>`);
-  if (c.cancelPct) chips.push(`<span class="flag-chip cancel">${c.cancelPct}% Cancel</span>`);
-  return chips.join('');
+  const v = (s||'unknown').toLowerCase().replace(/\s/g,'');
+  const labels = { paid:'Paid', refunded:'Refunded', voided:'Voided', pending:'Pending', unfulfilled:'Unfulfilled', fulfilled:'Fulfilled', notrequired:'Not Required' };
+  return `<span class="status ${v}">${labels[v]||s||'Unknown'}</span>`;
 }
 
-// ── Load Orders ──
+// ── Orders ──
 async function loadOrders() {
   try {
     allOrders = await api('/api/orders');
+    document.getElementById('store-name').textContent = allOrders.length + ' orders loaded';
     renderOrdersTable();
     renderDashOrders();
-  } catch(e) {
-    toast('Orders error: ' + e.message, 'error');
-  }
+  } catch(e) { toast('Orders error: ' + e.message, 'error'); }
 }
 
 function renderOrdersTable() {
-  const q = (document.getElementById('order-search')?.value || '').toLowerCase();
-  const f = document.getElementById('order-filter')?.value || '';
-  const rows = allOrders.filter(o => {
-    const mq = !q || o.name.toLowerCase().includes(q);
-    const mf = !f || (o.financial_status||'').includes(f);
-    return mq && mf;
-  });
+  const q = (document.getElementById('order-search')?.value||'').toLowerCase();
+  const f = document.getElementById('order-filter')?.value||'';
+  const rows = allOrders.filter(o => (!q||o.name.toLowerCase().includes(q)) && (!f||(o.financial_status||'').includes(f)));
   const el = document.getElementById('orders-tbody');
-  if (!rows.length) { el.innerHTML = `<tr><td colspan="7"><div class="empty"><div class="empty-icon">📦</div><h3>No orders</h3></div></td></tr>`; return; }
-  el.innerHTML = rows.map(o => {
-    const risk = getRiskFromTags(o.customer_tags);
-    return `<tr>
-      <td><strong>${o.name}</strong></td>
-      <td>${new Date(o.created_at).toLocaleDateString()}</td>
-      <td><strong>$${parseFloat(o.total_price||0).toFixed(2)}</strong></td>
-      <td>${statusBadge(o.financial_status)}</td>
-      <td>${statusBadge(o.fulfillment_status||'unfulfilled')}</td>
-      <td>${risk ? riskBadge(risk) : '<span style="color:var(--sub);font-size:12px">—</span>'}</td>
-      <td><button class="btn btn-outline btn-sm" onclick='openReturn(${JSON.stringify(o)})'>↩ Return</button></td>
-    </tr>`;
-  }).join('');
+  if (!rows.length) { el.innerHTML = `<tr><td colspan="7"><div class="empty" style="padding:40px 0"><span class="empty-icon">📦</span><h3>No orders found</h3></div></td></tr>`; return; }
+  el.innerHTML = rows.map(o => `<tr>
+    <td><strong style="font-size:14px">${o.name}</strong></td>
+    <td style="color:var(--sub)">${new Date(o.created_at).toLocaleDateString()}</td>
+    <td><strong>$${parseFloat(o.total_price||0).toFixed(2)}</strong></td>
+    <td>${statusBadge(o.financial_status)}</td>
+    <td>${statusBadge(o.fulfillment_status||'unfulfilled')}</td>
+    <td>${o.financial_status==='voided'||o.financial_status==='refunded' ? riskBadge('medium') : '<span style="color:var(--sub);font-size:12px">—</span>'}</td>
+    <td><button class="btn btn-outline btn-sm" onclick='openReturn(${JSON.stringify(o)})'>↩ Return</button></td>
+  </tr>`).join('');
 }
-
 function filterOrders() { renderOrdersTable(); }
 
 function renderDashOrders() {
-  const flagged = allOrders.filter(o =>
-    o.financial_status === 'refunded' || o.financial_status === 'voided'
-  ).slice(0, 6);
+  const flagged = allOrders.filter(o => o.financial_status==='refunded'||o.financial_status==='voided').slice(0,5);
   const el = document.getElementById('dash-orders');
-  if (!flagged.length) { el.innerHTML = `<tr><td colspan="6"><div class="empty" style="padding:30px 0"><h3>No flagged orders</h3><p>All orders look healthy</p></div></td></tr>`; return; }
-  el.innerHTML = flagged.map(o => {
-    const risk = o.financial_status === 'voided' ? 'high' : 'medium';
-    return `<tr>
-      <td><strong>${o.name}</strong></td>
-      <td>${o.customer_name || '—'}</td>
-      <td>$${parseFloat(o.total_price||0).toFixed(2)}</td>
-      <td>${statusBadge(o.financial_status)}</td>
-      <td>${riskBadge(risk)}</td>
-      <td><span class="flag-chip cancel">${o.financial_status}</span></td>
-    </tr>`;
-  }).join('');
+  if (!flagged.length) { el.innerHTML = `<tr><td colspan="5"><div class="empty" style="padding:30px 0"><h3>No flagged orders 🎉</h3><p>All orders look healthy</p></div></td></tr>`; return; }
+  el.innerHTML = flagged.map(o => `<tr>
+    <td><strong>${o.name}</strong></td>
+    <td><strong>$${parseFloat(o.total_price||0).toFixed(2)}</strong></td>
+    <td>${statusBadge(o.financial_status)}</td>
+    <td>${riskBadge(o.financial_status==='voided'?'high':'medium')}</td>
+    <td><span class="flag red">${o.financial_status}</span></td>
+  </tr>`).join('');
 }
 
 // ── Analytics ──
@@ -589,72 +728,72 @@ async function loadAnalytics() {
     document.getElementById('a-rate').textContent = d.returnRate + '%';
     document.getElementById('a-amount').textContent = '$' + d.refundAmount;
     document.getElementById('f-cancelled').textContent = d.totalRefunds;
-
-    // Performance insight
     if (d.totalOrders > 0) {
-      const ri = document.getElementById('perf-insight');
-      ri.style.display = 'flex';
-      document.getElementById('insight-title').textContent = 'Performance Insight';
-      document.getElementById('insight-body').textContent =
-        `Your app has analyzed ${d.totalOrders} orders and found ${d.totalRefunds} with returns (${d.returnRate}% return rate). Total refunded: $${d.refundAmount}.`;
+      const pi = document.getElementById('perf-insight');
+      pi.style.display = 'flex';
+      document.getElementById('insight-title').textContent = 'Performance Insight — ';
+      document.getElementById('insight-body').textContent = `Analyzed ${d.totalOrders} orders, found ${d.totalRefunds} with returns (${d.returnRate}% return rate). Total refunded: $${d.refundAmount}.`;
     }
-
     renderReasons('dash-reasons', d.topReasons);
     renderReasons('a-reasons', d.topReasons);
     renderProducts('a-products', d.topProducts);
     renderOffenders();
-  } catch(e) {
-    toast('Analytics error: ' + e.message, 'error');
-  }
+  } catch(e) { toast('Analytics error: ' + e.message, 'error'); }
 }
 
 function renderReasons(id, items) {
   const el = document.getElementById(id);
-  if (!items?.length) { el.innerHTML = '<p style="color:var(--sub);font-size:13px">No return reasons yet.</p>'; return; }
+  if (!items?.length) { el.innerHTML = '<p style="color:var(--sub);font-size:13px;font-weight:500">No return reasons recorded yet.</p>'; return; }
   const max = Math.max(...items.map(i => i.count));
   el.innerHTML = items.map(i => `
-    <div style="margin-bottom:12px">
-      <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px">
-        <span>${i.reason}</span><strong>${i.count}</strong>
+    <div style="margin-bottom:16px">
+      <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:600;margin-bottom:7px">
+        <span>${i.reason}</span><strong style="color:var(--blue)">${i.count}</strong>
       </div>
-      <div class="prog-wrap"><div class="prog-fill blue" style="width:${(i.count/max*100)}%"></div></div>
+      <div class="prog-wrap"><div class="prog-fill blue" style="width:${i.count/max*100}%"></div></div>
     </div>`).join('');
 }
 
 function renderProducts(id, items) {
   const el = document.getElementById(id);
-  if (!items?.length) { el.innerHTML = '<p style="color:var(--sub);font-size:13px">No data yet.</p>'; return; }
+  if (!items?.length) { el.innerHTML = '<p style="color:var(--sub);font-size:13px;font-weight:500">No product return data yet.</p>'; return; }
   const max = Math.max(...items.map(i => i.qty));
   el.innerHTML = items.map(i => `
-    <div style="margin-bottom:12px">
-      <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px">
-        <span>${i.name}</span><strong>${i.qty} returned</strong>
+    <div style="margin-bottom:16px">
+      <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:600;margin-bottom:7px">
+        <span>${i.name}</span><strong style="color:var(--red)">${i.qty} returned</strong>
       </div>
-      <div class="prog-wrap"><div class="prog-fill" style="width:${(i.qty/max*100)}%"></div></div>
+      <div class="prog-wrap"><div class="prog-fill red" style="width:${i.qty/max*100}%"></div></div>
     </div>`).join('');
 }
 
 function renderOffenders() {
   const el = document.getElementById('offender-list');
-  // Use scan results if available
-  const offenders = scanResults.slice(0, 5);
-  if (!offenders.length) {
-    el.innerHTML = '<div class="empty" style="padding:20px 0"><p>Run a scan to see repeat offenders</p><button class="btn btn-primary btn-sm" style="margin-top:10px" onclick="navTo(\'flagged\')">🔍 Run Scan</button></div>';
+  if (!scanResults.length) {
+    el.innerHTML = `<div class="empty" style="padding:20px 0">
+      <span class="empty-icon">🔍</span>
+      <h3>No scan data yet</h3>
+      <p>Run a scan to see repeat offenders</p>
+      <button class="btn btn-primary btn-sm" style="margin-top:14px" onclick="navTo('flagged')">Run Scan</button>
+    </div>`;
     return;
   }
-  el.innerHTML = offenders.map(c => {
-    const initials = (c.name || c.email || '?').charAt(0).toUpperCase();
-    const cancelPct = c.totalOrders ? Math.round((c.voidedCount + c.refundedCount) / c.totalOrders * 100) : 0;
+  el.innerHTML = scanResults.slice(0,5).map(c => {
+    const bad = c.badCount || (c.voidedCount + c.refundedCount);
+    const pct = c.totalOrders ? Math.round(bad/c.totalOrders*100) : 0;
+    const init = (c.name||'?').charAt(0).toUpperCase();
     return `<div class="offender-row">
-      <div class="offender-avatar">${initials}</div>
-      <div class="offender-info">
-        <div class="offender-name">${c.name || c.email || 'Unknown'}</div>
-        <div class="offender-meta">${c.email || ''} · ${c.totalOrders} orders</div>
-        <div class="prog-wrap" style="margin-top:6px;width:140px"><div class="prog-fill ${cancelPct>=40?'':'yellow'}" style="width:${cancelPct}%"></div></div>
+      <div class="offender-avatar">${init}</div>
+      <div style="flex:1">
+        <div class="offender-name">${c.name||'Unknown Customer'}</div>
+        <div class="offender-meta">${c.totalOrders} total orders · ${bad} bad</div>
+        <div class="prog-wrap" style="margin-top:8px;max-width:160px">
+          <div class="prog-fill red" style="width:${pct}%"></div>
+        </div>
       </div>
       <div class="offender-stats">
-        <div class="offender-val">${riskBadge(c.riskLevel)}</div>
-        <div class="offender-sub">Cancel: ${cancelPct}%</div>
+        ${riskBadge(c.riskLevel)}
+        <div style="font-size:11px;color:var(--sub);margin-top:4px;text-align:right">${pct}% cancel rate</div>
       </div>
     </div>`;
   }).join('');
@@ -664,102 +803,81 @@ function renderOffenders() {
 async function runScan() {
   const btn = document.getElementById('scan-btn');
   const prog = document.getElementById('scan-progress');
-  btn.disabled = true; btn.textContent = '⏳ Scanning...';
+  btn.disabled = true;
+  btn.innerHTML = '<span class="material-symbols-rounded">radar</span> Scanning...';
   prog.style.display = 'block';
-  prog.textContent = '🔍 Fetching 90 days of orders and analyzing customer patterns...';
-  document.getElementById('scan-alert').style.display = 'none';
-
+  prog.innerHTML = '⏳ Fetching 90 days of orders and analyzing customer patterns...';
   try {
-    const d = await api('/api/scan-high-risk', {
-      method: 'POST', headers: {'Content-Type':'application/json'}, body: '{}'
-    });
+    const d = await api('/api/scan-high-risk', { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' });
     scanResults = d.customers || [];
-
-    const high = scanResults.filter(c => c.riskLevel === 'high-risk').length;
-    const med = scanResults.filter(c => c.riskLevel === 'medium-risk').length;
-
+    const high = scanResults.filter(c=>c.riskLevel==='high-risk').length;
+    const med = scanResults.filter(c=>c.riskLevel==='medium-risk').length;
     document.getElementById('f-risky').textContent = high + med;
     document.getElementById('f-high').textContent = high;
     document.getElementById('flag-count').textContent = scanResults.length;
-
-    // Update tab counts
     document.getElementById('tab-all').textContent = scanResults.length;
     document.getElementById('tab-high').textContent = high;
-    document.getElementById('tab-cancel').textContent = scanResults.reduce((s,c)=>s+c.voidedCount+c.refundedCount,0);
-
+    document.getElementById('tab-cancel').textContent = scanResults.reduce((s,c)=>s+c.voidedCount,0);
     renderFlagged();
     renderOffenders();
-    prog.textContent = `✅ Scanned ${d.scanned} orders. Found ${d.flagged} risky customers. Orders tagged in Shopify.`;
+    prog.innerHTML = `✅ Scanned <strong>${d.scanned}</strong> orders · Found <strong>${d.flagged}</strong> risky customers · Orders tagged in Shopify`;
     toast(`Scan complete — ${d.flagged} customers flagged!`, 'success');
   } catch(e) {
-    prog.textContent = '❌ Error: ' + e.message;
+    prog.innerHTML = '❌ Error: ' + e.message;
     toast('Scan failed: ' + e.message, 'error');
   } finally {
-    btn.disabled = false; btn.textContent = '🔍 Scan & Tag';
+    btn.disabled = false;
+    btn.innerHTML = '<span class="material-symbols-rounded">radar</span> Scan & Auto-Tag';
   }
 }
 
 function renderFlagged() {
   const tbody = document.getElementById('flagged-tbody');
-  let rows = scanResults;
-  if (activeFilter === 'high') rows = rows.filter(c => c.riskLevel === 'high-risk');
-  if (activeFilter === 'cancelled') rows = rows.filter(c => c.voidedCount > 0);
-
+  let rows = activeFilter==='high' ? scanResults.filter(c=>c.riskLevel==='high-risk')
+           : activeFilter==='cancelled' ? scanResults.filter(c=>c.voidedCount>0)
+           : scanResults;
   if (!rows.length) {
-    tbody.innerHTML = `<tr><td colspan="9"><div class="empty"><div class="empty-icon">✅</div><h3>No flagged orders in this filter</h3></div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7"><div class="empty"><span class="empty-icon">✅</span><h3>No results in this filter</h3></div></td></tr>`;
     return;
   }
-
-  tbody.innerHTML = rows.map(c => {
-    const badCount = c.badCount || (c.voidedCount + c.refundedCount);
-    const cancelPct = c.totalOrders ? Math.round(badCount / c.totalOrders * 100) : 0;
-    return `<tr>
-      <td><strong>${c.badOrders.join(', ')}</strong><br><span style="font-size:11px;color:var(--sub)">${c.totalOrders} total orders</span></td>
-      <td style="font-size:12px;color:var(--sub)">Last 90 days</td>
-      <td><strong>${c.name}</strong></td>
-      <td>—</td>
-      <td>—</td>
-      <td>—</td>
-      <td>${riskBadge(c.riskLevel)}</td>
-      <td>
-        ${c.voidedCount > 0 ? `<span class="flag-chip cancel">${c.voidedCount} Voided</span>` : ''}
-        ${c.refundedCount > 0 ? `<span class="flag-chip return">${c.refundedCount} Returned</span>` : ''}
-        <span class="flag-chip cancel">${cancelPct}% Cancel</span>
-      </td>
-      <td></td>
-    </tr>`;
-  }).join('');
+  const bad = c => c.badCount || (c.voidedCount + c.refundedCount);
+  tbody.innerHTML = rows.map(c => `<tr>
+    <td><strong>${c.badOrders.join(', ')}</strong></td>
+    <td><strong>${c.name||'—'}</strong></td>
+    <td style="color:var(--sub)">${c.totalOrders}</td>
+    <td><strong style="color:var(--red)">${c.voidedCount}</strong></td>
+    <td><strong style="color:var(--yellow)">${c.refundedCount}</strong></td>
+    <td>${riskBadge(c.riskLevel)}</td>
+    <td>
+      ${c.voidedCount>0?`<span class="flag red">${c.voidedCount} Voided</span>`:''}
+      ${c.refundedCount>0?`<span class="flag yellow">${c.refundedCount} Returned</span>`:''}
+      <span class="flag purple">${c.totalOrders?Math.round(bad(c)/c.totalOrders*100):0}% Cancel</span>
+    </td>
+  </tr>`).join('');
 }
 
 // ── Risky Customers ──
 async function loadRiskyCustomers() {
   const tbody = document.getElementById('customers-tbody');
-  tbody.innerHTML = `<tr><td colspan="9"><div class="empty"><span class="spinner"></span></div></td></tr>`;
+  tbody.innerHTML = `<tr><td colspan="5"><div class="empty" style="padding:40px 0"><span class="spinner"></span></div></td></tr>`;
   try {
     const customers = await api('/api/high-risk-customers');
     if (!customers.length) {
-      tbody.innerHTML = `<tr><td colspan="9"><div class="empty"><div class="empty-icon">👥</div><h3>No high-risk customers yet</h3><p>Run a scan from Flagged Orders</p></div></td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="5"><div class="empty"><span class="empty-icon">👥</span><h3>No high-risk customers yet</h3><p>Run a scan from Flagged Orders</p></div></td></tr>`;
       return;
     }
     tbody.innerHTML = customers.map(c => {
       const tags = (c.tags||'').split(',').map(t=>t.trim()).filter(Boolean);
-      const risk = tags.includes('high-risk') ? 'high' : tags.includes('medium-risk') ? 'medium' : null;
-      const spent = parseFloat(c.total_spent||0).toFixed(2);
+      const risk = tags.includes('high-risk')?'high':tags.includes('medium-risk')?'medium':null;
       return `<tr>
         <td><strong>${c.first_name||''} ${c.last_name||''}</strong></td>
-        <td>${c.email||'—'}</td>
         <td>${c.orders_count||0}</td>
-        <td>$${spent}</td>
-        <td style="color:var(--red);font-weight:700">—</td>
-        <td style="color:var(--yellow);font-weight:700">—</td>
-        <td>—</td>
-        <td>${tags.filter(t=>!['high-risk','medium-risk'].includes(t)).map(t=>`<span class="flag-chip cancel">${t}</span>`).join('')}</td>
+        <td><strong>$${parseFloat(c.total_spent||0).toFixed(2)}</strong></td>
+        <td>${tags.map(t=>`<span class="flag ${t==='high-risk'?'red':t==='medium-risk'?'yellow':'blue'}">${t}</span>`).join('')}</td>
         <td>${riskBadge(risk)}</td>
       </tr>`;
     }).join('');
-  } catch(e) {
-    toast('Customers error: ' + e.message, 'error');
-  }
+  } catch(e) { toast('Customers error: ' + e.message, 'error'); }
 }
 
 // ── Return Modal ──
@@ -767,39 +885,36 @@ function openReturn(order) {
   currentOrder = order;
   document.getElementById('modal-items').innerHTML = (order.line_items||[]).map(li => `
     <div class="li-row">
-      <input type="checkbox" class="li-chk" data-id="${li.id}" checked>
-      <div style="flex:1">
+      <input type="checkbox" class="li-check li-chk" data-id="${li.id}" checked>
+      <div class="li-info">
         <div class="li-title">${li.title}${li.variant_title?' — '+li.variant_title:''}</div>
         <div class="li-price">$${li.price} × ${li.quantity}</div>
       </div>
       <input type="number" class="qty-inp li-qty" data-id="${li.id}" value="${li.quantity}" min="1" max="${li.quantity}">
-    </div>`).join('') || '<p style="color:var(--sub)">No items found</p>';
+    </div>`).join('') || '<p style="color:var(--sub);font-weight:500">No items found</p>';
   document.getElementById('return-modal').classList.add('open');
 }
-
 function closeModal() { document.getElementById('return-modal').classList.remove('open'); currentOrder = null; }
 
 async function submitReturn() {
   if (!currentOrder) return;
   const btn = document.getElementById('ret-btn');
-  btn.disabled = true; btn.textContent = 'Processing...';
+  btn.disabled = true; btn.innerHTML = '<span class="material-symbols-rounded">hourglass_empty</span> Processing...';
   const lineItems = [];
   document.querySelectorAll('.li-chk:checked').forEach(cb => {
     lineItems.push({ id: cb.dataset.id, quantity: parseInt(document.querySelector(`.li-qty[data-id="${cb.dataset.id}"]`).value) });
   });
-  const reason = document.getElementById('ret-reason').value + (document.getElementById('ret-notes').value ? ' – ' + document.getElementById('ret-notes').value : '');
+  const reason = document.getElementById('ret-reason').value + (document.getElementById('ret-notes').value?' – '+document.getElementById('ret-notes').value:'');
   try {
     await api('/api/returns', { method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ orderId: currentOrder.id, lineItems, reason, notifyCustomer: document.getElementById('ret-notify').checked })
     });
-    toast('Return created!', 'success');
-    closeModal();
-    loadOrders();
-    loadAnalytics();
-  } catch(e) {
-    toast('Return failed: ' + e.message, 'error');
-  } finally {
-    btn.disabled = false; btn.textContent = 'Create Return';
+    toast('Return created successfully!', 'success');
+    closeModal(); loadOrders(); loadAnalytics();
+  } catch(e) { toast('Return failed: ' + e.message, 'error'); }
+  finally {
+    btn.disabled = false;
+    btn.innerHTML = '<span class="material-symbols-rounded">assignment_return</span> Create Return';
   }
 }
 
@@ -811,32 +926,27 @@ function saveRules() {
     tagHigh: document.getElementById('rule-tag-high').value,
     tagMedium: document.getElementById('rule-tag-medium').value,
   }));
-  toast('Rules saved!', 'success');
+  toast('Rules saved successfully!', 'success');
 }
 
-// ── Check webhook status ──
+// ── Webhook status ──
 async function checkWebhook() {
   try {
-    const data = await api('/api/webhook-status');
-    const wh = data.webhooks?.[0];
-    const box = document.getElementById('webhook-status');
-    const title = document.getElementById('wh-title');
-    const body = document.getElementById('wh-body');
+    const d = await api('/api/webhook-status');
+    const wh = d.webhooks?.[0];
+    const el = document.getElementById('webhook-alert');
     if (wh) {
-      box.className = 'alert info';
-      box.style.background = '#f0fdf4';
-      box.style.borderColor = '#86efac';
-      document.querySelector('#webhook-status .alert-icon').textContent = '✅';
-      title.textContent = 'Auto-Tag Webhook Active';
-      body.textContent = `Every new order is automatically checked against 90-day customer history and tagged instantly. Webhook: ${wh.address}`;
+      el.innerHTML = `<div class="alert success" style="margin-bottom:20px">
+        <div class="alert-icon">🔗</div>
+        <div><strong>Auto-Tag Webhook Active</strong><span>Every new order is automatically checked and tagged in real-time. Monitoring: ${wh.address}</span></div>
+      </div>`;
     } else {
-      box.className = 'alert warning';
-      title.textContent = 'Auto-Tag Webhook Not Found';
-      body.textContent = 'Restart the server to register the webhook automatically.';
+      el.innerHTML = `<div class="alert warning" style="margin-bottom:20px">
+        <div class="alert-icon">⚠️</div>
+        <div><strong>Webhook Not Active</strong><span>Restart the server to register the auto-tag webhook.</span></div>
+      </div>`;
     }
-  } catch(e) {
-    console.warn('Webhook check failed:', e.message);
-  }
+  } catch(e) { console.warn('Webhook check:', e.message); }
 }
 
 // ── Init ──
