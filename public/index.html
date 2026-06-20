@@ -443,6 +443,31 @@ select.form-control option{background:var(--surface2);}
     </div>
     <div id="scan-progress" style="display:none;padding:14px 20px;border-top:1px solid var(--border);font-size:13px;font-weight:600;color:var(--sub)"></div>
   </div>
+
+  <!-- Medium Risk Detail -->
+  <div id="medium-risk-section" style="display:none">
+    <div class="card" style="border-color:rgba(255,184,79,.3)">
+      <div class="card-head" style="background:var(--yellow-soft)">
+        <div class="card-title"><span style="color:var(--yellow)">🟡</span> Medium Risk Customers — Watch List</div>
+        <span style="font-size:12px;color:var(--yellow);font-weight:700" id="medium-count-label"></span>
+      </div>
+      <div class="card-body">
+        <div class="alert warning" style="margin-bottom:16px">
+          <div class="alert-icon">⚠️</div>
+          <div>
+            <strong>What is Medium Risk?</strong>
+            <span>These customers have <strong>1 voided or refunded order</strong> in the last 90 days. They are being watched — one more bad order will automatically upgrade them to <strong>High Risk 🔴</strong>.</span>
+          </div>
+        </div>
+        <div style="overflow-x:auto">
+          <table class="data-table">
+            <thead><tr><th>Customer</th><th>Bad Order</th><th>Total Orders</th><th>Type</th><th>Action Required</th></tr></thead>
+            <tbody id="medium-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- ── CUSTOMERS ── -->
@@ -823,6 +848,7 @@ async function runScan() {
     document.getElementById('tab-cancel').textContent = scanResults.reduce((s,c)=>s+c.voidedCount,0);
     renderFlagged();
     renderOffenders();
+    renderMediumRisk();
     prog.innerHTML = `✅ Scanned <strong>${d.scanned}</strong> orders · Found <strong>${d.flagged}</strong> risky customers · Orders tagged in Shopify`;
     toast(`Scan complete — ${d.flagged} customers flagged!`, 'success');
   } catch(e) {
@@ -832,6 +858,33 @@ async function runScan() {
     btn.disabled = false;
     btn.innerHTML = '<span class="material-symbols-rounded">radar</span> Scan & Auto-Tag';
   }
+}
+
+function renderMediumRisk() {
+  const medium = scanResults.filter(c => c.riskLevel === 'medium-risk');
+  const section = document.getElementById('medium-risk-section');
+  if (!medium.length) { section.style.display = 'none'; return; }
+  section.style.display = 'block';
+  document.getElementById('medium-count-label').textContent = medium.length + ' customer(s) on watch list';
+  document.getElementById('medium-tbody').innerHTML = medium.map(c => `<tr>
+    <td>
+      <a href="https://${window._shop||''}/admin/customers/${c.customerId}"
+         target="_blank"
+         style="color:var(--yellow);font-weight:700;text-decoration:none;display:flex;align-items:center;gap:5px"
+         onmouseover="this.style.textDecoration='underline'"
+         onmouseout="this.style.textDecoration='none'">
+        <span class="material-symbols-rounded" style="font-size:15px">open_in_new</span>
+        ${c.name||'Customer '+c.customerId}
+      </a>
+    </td>
+    <td><strong>${c.badOrders.join(', ')}</strong></td>
+    <td style="color:var(--sub)">${c.totalOrders}</td>
+    <td>
+      ${c.voidedCount>0?`<span class="flag yellow">Voided</span>`:''}
+      ${c.refundedCount>0?`<span class="flag yellow">Refunded</span>`:''}
+    </td>
+    <td><span class="flag yellow">⚠️ Monitor — 1 more bad order → 🔴 High Risk</span></td>
+  </tr>`).join('');
 }
 
 function renderFlagged() {
@@ -846,7 +899,16 @@ function renderFlagged() {
   const bad = c => c.badCount || (c.voidedCount + c.refundedCount);
   tbody.innerHTML = rows.map(c => `<tr>
     <td><strong>${c.badOrders.join(', ')}</strong></td>
-    <td><strong>${c.name||'—'}</strong></td>
+    <td>
+      <a href="https://${window._shop||'your-store.myshopify.com'}/admin/customers/${c.customerId}" 
+         target="_blank" 
+         style="color:var(--blue);font-weight:700;text-decoration:none;display:flex;align-items:center;gap:5px"
+         onmouseover="this.style.textDecoration='underline'" 
+         onmouseout="this.style.textDecoration='none'">
+        <span class="material-symbols-rounded" style="font-size:15px">open_in_new</span>
+        ${c.name||'Customer '+c.customerId}
+      </a>
+    </td>
     <td style="color:var(--sub)">${c.totalOrders}</td>
     <td><strong style="color:var(--red)">${c.voidedCount}</strong></td>
     <td><strong style="color:var(--yellow)">${c.refundedCount}</strong></td>
@@ -855,6 +917,8 @@ function renderFlagged() {
       ${c.voidedCount>0?`<span class="flag red">${c.voidedCount} Voided</span>`:''}
       ${c.refundedCount>0?`<span class="flag yellow">${c.refundedCount} Returned</span>`:''}
       <span class="flag purple">${c.totalOrders?Math.round(bad(c)/c.totalOrders*100):0}% Cancel</span>
+      ${c.riskLevel==='medium-risk'?`<span class="flag blue">⚠️ Watch</span>`:''}
+      ${c.riskLevel==='high-risk'?`<span class="flag red">🚫 Block</span>`:''}
     </td>
   </tr>`).join('');
 }
@@ -954,10 +1018,15 @@ async function checkWebhook() {
 
 // ── Init ──
 (async () => {
+  // Get store domain for customer profile links
+  try {
+    const h = await api('/health');
+    if (h.shop) window._shop = h.shop;
+  } catch(e) {}
   await loadOrders();
   await loadAnalytics();
   await checkWebhook();
-  await runScan(); // auto-scan on load so dashboard is always populated
+  await runScan();
 })();
 </script>
 </body>
