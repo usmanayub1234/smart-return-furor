@@ -629,9 +629,12 @@ function navTo(page) {
   document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === `page-${page}`));
   if (page === 'analytics') loadAnalytics();
   if (page === 'customers') loadRiskyCustomers();
-  if (page === 'flagged' && !scanResults.length) {
-    document.getElementById('scan-progress').style.display = 'block';
-    document.getElementById('scan-progress').textContent = '👆 Click "Scan & Auto-Tag" to detect risky customers based on 90-day history';
+  if (page === 'flagged') {
+    if (scanResults.length) {
+      renderFlagged(); // re-render existing results
+    } else {
+      runScan(); // auto-scan on first visit
+    }
   }
 }
 document.querySelectorAll('.nav-item').forEach(n => n.addEventListener('click', () => navTo(n.dataset.page)));
@@ -954,6 +957,7 @@ async function checkWebhook() {
   await loadOrders();
   await loadAnalytics();
   await checkWebhook();
+  await runScan(); // auto-scan on load so dashboard is always populated
 })();
 </script>
 </body>
