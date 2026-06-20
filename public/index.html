@@ -502,9 +502,9 @@ function getRiskFromTags(tags = '') {
   return null;
 }
 function riskBadge(level) {
-  if (!level) return '';
-  if (level === 'high') return '<span class="risk high">🔴 Risky</span>';
-  if (level === 'medium') return '<span class="risk medium">🟡 Medium</span>';
+  if (!level) return '<span class="risk low">✅ Safe</span>';
+  if (level === 'high-risk' || level === 'high') return '<span class="risk high">🔴 High Risk</span>';
+  if (level === 'medium-risk' || level === 'medium') return '<span class="risk medium">🟡 Medium Risk</span>';
   return '<span class="risk low">✅ Safe</span>';
 }
 function statusBadge(s) {
@@ -711,16 +711,21 @@ function renderFlagged() {
   }
 
   tbody.innerHTML = rows.map(c => {
-    const cancelPct = c.totalOrders ? Math.round((c.voidedCount+c.refundedCount)/c.totalOrders*100) : 0;
+    const badCount = c.badCount || (c.voidedCount + c.refundedCount);
+    const cancelPct = c.totalOrders ? Math.round(badCount / c.totalOrders * 100) : 0;
     return `<tr>
-      <td><strong>${c.badOrders.join(', ')}</strong></td>
+      <td><strong>${c.badOrders.join(', ')}</strong><br><span style="font-size:11px;color:var(--sub)">${c.totalOrders} total orders</span></td>
+      <td style="font-size:12px;color:var(--sub)">Last 90 days</td>
+      <td><strong>${c.name}</strong></td>
       <td>—</td>
-      <td>${c.name || '—'}</td>
-      <td><strong>${c.email||'—'}</strong></td>
       <td>—</td>
       <td>—</td>
       <td>${riskBadge(c.riskLevel)}</td>
-      <td>${flagChips({...c, cancelPct})}</td>
+      <td>
+        ${c.voidedCount > 0 ? `<span class="flag-chip cancel">${c.voidedCount} Voided</span>` : ''}
+        ${c.refundedCount > 0 ? `<span class="flag-chip return">${c.refundedCount} Returned</span>` : ''}
+        <span class="flag-chip cancel">${cancelPct}% Cancel</span>
+      </td>
       <td></td>
     </tr>`;
   }).join('');

@@ -179,18 +179,21 @@ app.post("/api/scan-high-risk", async (req, res) => {
         customerMap[cid].voidedCount++;
         customerMap[cid].badOrders.push(order.name);
       }
-      if (status === "refunded" || order.refunds?.length > 0) {
+      // Only count refunded if NOT already counted as voided
+      if ((status === "refunded" || order.refunds?.length > 0) && status !== "voided") {
         customerMap[cid].refundedCount++;
         customerMap[cid].badOrders.push(order.name);
       }
     }
 
     // Determine risk level per customer
-    // HIGH RISK: 2+ voided/refunded in 3 months
-    // MEDIUM RISK: 1 voided/refunded
+    // HIGH RISK: 2+ unique bad orders in 3 months
+    // MEDIUM RISK: 1 bad order
     const results = [];
     for (const [cid, c] of Object.entries(customerMap)) {
-      const badCount = c.voidedCount + c.refundedCount;
+      // Deduplicate bad orders
+      c.badOrders = [...new Set(c.badOrders)];
+      const badCount = c.badOrders.length;
       if (badCount === 0) continue;
 
       let riskLevel = badCount >= 2 ? "high-risk" : "medium-risk";
@@ -251,7 +254,8 @@ app.post("/api/scan-high-risk", async (req, res) => {
           totalOrders: c.totalOrders,
           voidedCount: c.voidedCount,
           refundedCount: c.refundedCount,
-          badOrders: [...new Set(c.badOrders)],
+          badCount,
+          badOrders: c.badOrders,
           riskLevel,
           tags: merged,
         });
