@@ -437,23 +437,72 @@ app.post("/webhooks/orders/create", express.raw({ type: "application/json" }), a
     const order = JSON.parse(req.body.toString());
     const customerId = order.customer?.id;
     const orderId = order.id;
+    const orderName = order.name;
 
     if (!customerId) {
-      console.log(`Webhook: Order ${order.name} has no customer — skipping`);
+      console.log(`Webhook: Order ${orderName} has no customer — skipping`);
       return;
     }
 
-    console.log(`🔔 New order ${order.name} from customer ${customerId} — checking risk...`);
+    console.log(`🔔 New order ${orderName} (${orderId}) from customer ${customerId} — checking risk...`);
 
-    const risk = await analyseCustomerRisk(customerId);
-    console.log(`Customer ${customerId}: ${risk.badCount} bad orders in 90 days → ${risk.riskLevel || "safe"}`);
+    // Use REST to get customer's order history — no PII issues
+    const since = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+    const historyData = await shopifyRequest("GET",
+      `orders.json?customer_id=${customerId}&status=any&created_at_min=${since}&limit=250&fields=id,name,financial_status,cancel_reason`
+    );
 
-    if (risk.riskLevel) {
-      await applyRiskTags(customerId, orderId, risk);
-      console.log(`🚨 Flagged order ${order.name} as ${risk.riskLevel}`);
-    } else {
-      console.log(`✅ Order ${order.name} — customer is safe`);
+    const history = historyData.orders || [];
+    console.log(`Customer ${customerId}: found ${history.length} orders in last 90 days`);
+
+    // Count bad orders — exclude the current new order
+    const badOrders = history.filter(o =>
+      o.id !== orderId &&
+      (o.financial_status === "voided" || o.financial_status === "refunded")
+    );
+    const badCount = badOrders.length;
+    const riskLevel = badCount >= 2 ? "high-risk" : badCount === 1 ? "medium-risk" : null;
+
+    console.log(`Customer ${customerId}: ${badCount} bad orders → ${riskLevel || "safe"}`);
+
+    if (!riskLevel) {
+      console.log(`✅ Order ${orderName} — customer is safe, no tagging needed`);
+      return;
     }
+
+    // 1. Tag the customer profile
+    const custData = await shopifyRequest("GET", `customers/${customerId}.json?fields=id,tags`);
+    const existingCustTags = custData.customer?.tags
+      ? custData.customer.tags.split(",").map(t => t.trim()).filter(Boolean)
+      : [];
+    const newCustTags = [riskLevel, ...badOrders.some(o => o.financial_status === "voided") ? ["voided-order"] : [], badOrders.some(o => o.financial_status === "refunded") ? "frequent-returns" : []];
+    const mergedCustTags = [...new Set([...existingCustTags, ...newCustTags])];
+    await shopifyRequest("PUT", `customers/${customerId}.json`, {
+      customer: {
+        id: customerId,
+        tags: mergedCustTags.join(", "),
+        note: `⚠️ Auto-flagged: ${badCount} bad order(s) in last 90 days: ${badOrders.map(o=>o.name).join(", ")}`,
+      },
+    });
+
+    // 2. Tag THIS new order directly
+    const orderTag = riskLevel === "high-risk"
+      ? "Smart Returns - High Risk Order"
+      : "Smart Returns - Medium Risk Order";
+
+    const existingOrderData = await shopifyRequest("GET", `orders/${orderId}.json?fields=id,tags`);
+    const existingOrderTags = existingOrderData.order?.tags
+      ? existingOrderData.order.tags.split(",").map(t => t.trim()).filter(Boolean)
+      : [];
+
+    if (!existingOrderTags.includes(orderTag)) {
+      await shopifyRequest("PUT", `orders/${orderId}.json`, {
+        order: { id: orderId, tags: [...existingOrderTags, orderTag].join(", ") },
+      });
+    }
+
+    console.log(`🚨 Auto-tagged order ${orderName} as "${orderTag}" (customer had ${badCount} bad orders)`);
+
   } catch (e) {
     console.error("Webhook processing error:", e.message);
   }
