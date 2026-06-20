@@ -357,18 +357,66 @@ select.form-control option{background:var(--surface2);}
 
   <div id="perf-insight" style="display:none" class="alert info">
     <div class="alert-icon">💡</div>
-    <div><strong id="insight-title"></strong><span id="insight-body"></span></div>
+    <div>
+      <strong>Performance Insight</strong>
+      <span id="insight-body"></span>
+      <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn btn-outline btn-sm" onclick="navTo('customers')">👥 View All Risky Customers</button>
+        <button class="btn btn-outline btn-sm" onclick="navTo('rules')">⚙️ Adjust Risk Thresholds</button>
+      </div>
+    </div>
   </div>
 
   <div class="two-col">
     <div class="card">
       <div class="card-head">
-        <div class="card-title"><span class="material-symbols-rounded" style="color:var(--red)">person_alert</span> Repeat Offenders</div>
-        <button class="btn btn-outline btn-sm" onclick="navTo('customers')">View All</button>
+        <div class="card-title"><span class="material-symbols-rounded" style="color:var(--red)">person_alert</span> Repeat Offender Spotlight</div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-outline btn-sm" id="tab-offenders" onclick="switchOffenderTab('offenders')" style="border-color:var(--blue);color:var(--blue)">Repeat Offenders</button>
+          <button class="btn btn-outline btn-sm" id="tab-alerts" onclick="switchOffenderTab('alerts')">Recent Alerts</button>
+        </div>
       </div>
-      <div class="card-body" id="offender-list">
-        <div class="empty"><span class="spinner"></span></div>
+
+      <!-- Repeat Offenders Tab -->
+      <div id="offender-tab-offenders">
+        <div style="overflow-x:auto">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Order</th>
+                <th>Offender</th>
+                <th>Value</th>
+                <th>Risk Profile</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="offender-list">
+              <tr><td colspan="5"><div class="empty" style="padding:30px 0"><span class="spinner"></span></div></td></tr>
+            </tbody>
+          </table>
+        </div>
       </div>
+
+      <!-- Recent Alerts Tab -->
+      <div id="offender-tab-alerts" style="display:none">
+        <div style="overflow-x:auto">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Order</th>
+                <th>Customer</th>
+                <th>Value</th>
+                <th>Alert Type</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="alerts-list">
+              <tr><td colspan="5"><div class="empty" style="padding:30px 0"><span class="spinner"></span></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
     </div>
     <div class="card">
       <div class="card-head">
@@ -759,8 +807,12 @@ async function loadAnalytics() {
     if (d.totalOrders > 0) {
       const pi = document.getElementById('perf-insight');
       pi.style.display = 'flex';
-      document.getElementById('insight-title').textContent = 'Performance Insight — ';
-      document.getElementById('insight-body').textContent = `Analyzed ${d.totalOrders} orders, found ${d.totalRefunds} with returns (${d.returnRate}% return rate). Total refunded: $${d.refundAmount}.`;
+      const high = scanResults.filter(c=>c.riskLevel==='high-risk').length;
+      const med = scanResults.filter(c=>c.riskLevel==='medium-risk').length;
+      document.getElementById('insight-body').innerHTML =
+        `Your app has identified <strong>${high} high-risk</strong> and <strong>${med} medium-risk</strong> entities this period. ` +
+        `Return rate: <strong>${d.returnRate}%</strong>. Total refunded: <strong>$${d.refundAmount}</strong>. ` +
+        `Catching these early helps protect your revenue from return fraud and policy abuse.`;
     }
     renderReasons('dash-reasons', d.topReasons);
     renderReasons('a-reasons', d.topReasons);
@@ -795,36 +847,95 @@ function renderProducts(id, items) {
     </div>`).join('');
 }
 
+function switchOffenderTab(tab) {
+  document.getElementById('offender-tab-offenders').style.display = tab==='offenders'?'block':'none';
+  document.getElementById('offender-tab-alerts').style.display = tab==='alerts'?'block':'none';
+  document.getElementById('tab-offenders').style.borderColor = tab==='offenders'?'var(--blue)':'var(--border)';
+  document.getElementById('tab-offenders').style.color = tab==='offenders'?'var(--blue)':'var(--sub)';
+  document.getElementById('tab-alerts').style.borderColor = tab==='alerts'?'var(--blue)':'var(--border)';
+  document.getElementById('tab-alerts').style.color = tab==='alerts'?'var(--blue)':'var(--sub)';
+}
+
 function renderOffenders() {
   const el = document.getElementById('offender-list');
+  const alertsEl = document.getElementById('alerts-list');
+
   if (!scanResults.length) {
-    el.innerHTML = `<div class="empty" style="padding:20px 0">
-      <span class="empty-icon">🔍</span>
-      <h3>No scan data yet</h3>
-      <p>Run a scan to see repeat offenders</p>
-      <button class="btn btn-primary btn-sm" style="margin-top:14px" onclick="navTo('flagged')">Run Scan</button>
-    </div>`;
+    el.innerHTML = `<tr><td colspan="5"><div class="empty" style="padding:30px 0"><span class="empty-icon">🔍</span><h3>No scan data yet</h3><p>Loading scan results...</p></div></td></tr>`;
+    alertsEl.innerHTML = el.innerHTML;
     return;
   }
-  el.innerHTML = scanResults.slice(0,5).map(c => {
+
+  // Get all bad orders across all customers
+  const allBadOrders = [];
+  for (const c of scanResults) {
+    for (const orderName of c.badOrders) {
+      allBadOrders.push({ orderName, customer: c });
+    }
+  }
+
+  if (!allBadOrders.length) {
+    el.innerHTML = `<tr><td colspan="5"><div class="empty" style="padding:30px 0"><span class="empty-icon">✅</span><h3>No repeat offenders found</h3></div></td></tr>`;
+    return;
+  }
+
+  // Repeat Offenders table — one row per bad order
+  el.innerHTML = allBadOrders.map(({ orderName, customer: c }) => {
     const bad = c.badCount || (c.voidedCount + c.refundedCount);
-    const pct = c.totalOrders ? Math.round(bad/c.totalOrders*100) : 0;
-    const init = (c.name||'?').charAt(0).toUpperCase();
-    return `<div class="offender-row">
-      <div class="offender-avatar">${init}</div>
-      <div style="flex:1">
-        <div class="offender-name">${c.name||'Unknown Customer'}</div>
-        <div class="offender-meta">${c.totalOrders} total orders · ${bad} bad</div>
-        <div class="prog-wrap" style="margin-top:8px;max-width:160px">
-          <div class="prog-fill red" style="width:${pct}%"></div>
-        </div>
-      </div>
-      <div class="offender-stats">
-        ${riskBadge(c.riskLevel)}
-        <div style="font-size:11px;color:var(--sub);margin-top:4px;text-align:right">${pct}% cancel rate</div>
-      </div>
-    </div>`;
+    const cancelPct = c.totalOrders ? Math.round(bad / c.totalOrders * 100) : 0;
+    const returnPct = c.totalOrders ? Math.round(c.refundedCount / c.totalOrders * 100) : 0;
+    const statusLabel = c.riskLevel === 'high-risk' ? 
+      `<span class="risk high">🔴 Risky</span>` : 
+      `<span class="risk medium">🟡 Medium</span>`;
+    return `<tr>
+      <td><strong>${orderName}</strong></td>
+      <td>
+        <a href="https://${window._shop||''}/admin/customers/${c.customerId}"
+           target="_blank"
+           style="color:var(--blue);font-weight:700;text-decoration:none"
+           onmouseover="this.style.textDecoration='underline'"
+           onmouseout="this.style.textDecoration='none'">
+          ${c.name||'Customer '+c.customerId}
+        </a>
+        <div style="font-size:11px;color:var(--sub);margin-top:2px">Rating: ${c.riskLevel==='high-risk'?'Risky':'Medium'}</div>
+      </td>
+      <td><strong>—</strong></td>
+      <td>
+        <div style="font-size:12px;font-weight:600">Return: ${returnPct}%</div>
+        <div style="font-size:12px;color:var(--sub)">Cancel: ${cancelPct}%</div>
+      </td>
+      <td>${statusLabel}</td>
+    </tr>`;
   }).join('');
+
+  // Recent Alerts — voided orders needing attention
+  const voidedCustomers = scanResults.filter(c => c.voidedCount > 0);
+  if (!voidedCustomers.length) {
+    alertsEl.innerHTML = `<tr><td colspan="5"><div class="empty" style="padding:20px 0"><h3>No recent alerts</h3></div></td></tr>`;
+    return;
+  }
+  alertsEl.innerHTML = voidedCustomers.map(c => `<tr>
+    <td><strong>${c.badOrders[0]||'—'}</strong></td>
+    <td>
+      <a href="https://${window._shop||''}/admin/customers/${c.customerId}"
+         target="_blank"
+         style="color:var(--blue);font-weight:700;text-decoration:none"
+         onmouseover="this.style.textDecoration='underline'"
+         onmouseout="this.style.textDecoration='none'">
+        ${c.name||'Customer '+c.customerId}
+      </a>
+    </td>
+    <td>—</td>
+    <td>
+      ${c.voidedCount>0?`<span class="flag red">🔴 Order Voided</span>`:''}
+      ${c.refundedCount>0?`<span class="flag yellow">🟡 Refunded</span>`:''}
+    </td>
+    <td>
+      <button class="btn btn-outline btn-sm" onclick="navTo('flagged')" style="font-size:11px">
+        View Details
+      </button>
+    </td>
+  </tr>`).join('');
 }
 
 // ── Scan ──
