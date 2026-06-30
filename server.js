@@ -78,10 +78,12 @@ function applyCleanCustomerRiskTags(existingTags, newRiskTags) {
 // customers aren't unfairly flagged.
 // ════════════════════════════════════════════════
 //
-// Rules:
-//  - HIGH RISK   → badCount >= 3   OR   successRate < 70%  (with totalOrders >= 2)
-//  - MEDIUM RISK → badCount === 2  OR   successRate < 85%  (with totalOrders >= 2)
-//  - SAFE        → otherwise (e.g. 3 bad out of 10 = 70% success = NOT risky)
+// Rules (in priority order):
+//  1. badCount >= 3            → ALWAYS HIGH RISK (hard rule, no exceptions)
+//  2. successRate < 70%        → HIGH RISK (catches low-volume serial cancelers)
+//  3. badCount === 2           → MEDIUM RISK (unless successRate >= 85% with 5+ orders → safe)
+//  4. badCount === 1           → MEDIUM RISK (unless successRate >= 85% with 5+ orders → safe)
+//  5. otherwise                → SAFE
 //
 // successRate = (totalOrders - badCount) / totalOrders * 100
 //
@@ -91,40 +93,22 @@ function classifyRisk(totalOrders, badCount) {
   }
 
   const successRate = ((totalOrders - badCount) / totalOrders) * 100;
-
-  // Need at least 2 orders for percentage-based logic to mean anything;
-  // for brand-new customers (1-2 orders) fall back to pure count rules.
   const enoughVolume = totalOrders >= 5;
 
-  let riskLevel = null;
-
+  // RULE 1 — hard cap: 3+ bad orders is ALWAYS high risk, no percentage escape hatch
   if (badCount >= 3) {
-    // 3+ bad orders is always concerning UNLESS volume is high and rate is still good
-    if (enoughVolume && successRate >= 70) {
-      riskLevel = "medium-risk"; // high volume, decent success rate — downgrade
-    } else {
-      riskLevel = "high-risk";
-    }
-  } else if (badCount === 2) {
-    if (enoughVolume && successRate >= 85) {
-      riskLevel = null; // plenty of orders, still 85%+ success — safe
-    } else {
-      riskLevel = "medium-risk";
-    }
-  } else if (badCount === 1) {
-    if (enoughVolume && successRate >= 85) {
-      riskLevel = null; // one-off issue, high volume good customer — safe
-    } else {
-      riskLevel = "medium-risk";
-    }
+    return { riskLevel: "high-risk", successRate: Math.round(successRate * 10) / 10 };
   }
 
-  // Percentage override: very poor success rate always pushes to high-risk
-  // regardless of count (catches low-volume serial cancelers fast)
+  // RULE 2 — very poor success rate is always high risk regardless of count
   if (totalOrders >= 2 && successRate < 70) {
-    riskLevel = "high-risk";
-  } else if (totalOrders >= 2 && successRate < 85 && riskLevel === null) {
-    riskLevel = "medium-risk";
+    return { riskLevel: "high-risk", successRate: Math.round(successRate * 10) / 10 };
+  }
+
+  // RULE 3/4 — 1 or 2 bad orders: medium risk, unless high volume + high success rate
+  let riskLevel = "medium-risk";
+  if (enoughVolume && successRate >= 85) {
+    riskLevel = null; // good track record despite a hiccup — safe
   }
 
   return { riskLevel, successRate: Math.round(successRate * 10) / 10 };
