@@ -666,6 +666,20 @@ select.form-control option{background:var(--surface2);}
       </button>
     </div>
   </div>
+
+  <div class="card">
+    <div class="card-head"><div class="card-title"><span class="material-symbols-rounded" style="color:var(--yellow)">cleaning_services</span> Fix Duplicate Tags</div></div>
+    <div class="card-body">
+      <div class="alert warning" style="margin-bottom:16px">
+        <div class="alert-icon">⚠️</div>
+        <div><strong>One-time cleanup</strong><span>If any order has both "High Risk" and "Medium Risk" tags from before the fix, run this to clean them up. High Risk always wins.</span></div>
+      </div>
+      <button class="btn btn-outline" id="cleanup-btn" onclick="runCleanup()">
+        <span class="material-symbols-rounded">cleaning_services</span> Scan & Fix Duplicate Tags
+      </button>
+      <div id="cleanup-result" style="margin-top:14px"></div>
+    </div>
+  </div>
 </div>
 
 </div><!-- /main -->
@@ -1130,6 +1144,29 @@ function saveRules() {
     tagMedium: document.getElementById('rule-tag-medium').value,
   }));
   toast('Rules saved successfully!', 'success');
+}
+
+async function runCleanup() {
+  const btn = document.getElementById('cleanup-btn');
+  const result = document.getElementById('cleanup-result');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="material-symbols-rounded">cleaning_services</span> Scanning...';
+  result.innerHTML = '<div style="color:var(--sub);font-size:13px;font-weight:600">⏳ Checking all orders for duplicate risk tags...</div>';
+  try {
+    const d = await api('/api/cleanup-duplicate-tags', { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' });
+    if (d.fixed === 0) {
+      result.innerHTML = `<div class="alert success"><div class="alert-icon">✅</div><div><strong>All clean!</strong><span>Scanned ${d.scanned} orders — no duplicate tags found.</span></div></div>`;
+    } else {
+      result.innerHTML = `<div class="alert success"><div class="alert-icon">✅</div><div><strong>Fixed ${d.fixed} order(s)</strong><span>Removed duplicate Medium Risk tag from: ${d.fixedOrders.join(', ')}</span></div></div>`;
+    }
+    toast(`Cleanup complete — ${d.fixed} order(s) fixed`, 'success');
+  } catch(e) {
+    result.innerHTML = `<div class="alert" style="background:var(--red-soft);border-color:rgba(255,79,107,.3)"><div class="alert-icon">❌</div><div><strong>Cleanup failed</strong><span>${e.message}</span></div></div>`;
+    toast('Cleanup failed: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<span class="material-symbols-rounded">cleaning_services</span> Scan & Fix Duplicate Tags';
+  }
 }
 
 // ── Webhook status ──

@@ -54,6 +54,23 @@ function shopifyGQL(query) {
   return shopifyRequest("POST", "graphql.json", { query });
 }
 
+// ── Tag hygiene: remove any conflicting Smart Returns risk tag before adding the correct one ──
+const RISK_TAGS = ["Smart Returns - High Risk Order", "Smart Returns - Medium Risk Order"];
+const CUST_RISK_TAGS = ["high-risk", "medium-risk"];
+
+function applyCleanRiskTag(existingTags, newTag) {
+  // Strip out any other Smart Returns risk tag, then add the correct one
+  const cleaned = existingTags.filter(t => !RISK_TAGS.includes(t));
+  cleaned.push(newTag);
+  return [...new Set(cleaned)];
+}
+
+function applyCleanCustomerRiskTags(existingTags, newRiskTags) {
+  // newRiskTags may include "high-risk"/"medium-risk" plus "voided-order"/"frequent-returns"
+  const cleaned = existingTags.filter(t => !CUST_RISK_TAGS.includes(t));
+  return [...new Set([...cleaned, ...newRiskTags])];
+}
+
 // ════════════════════════════════════════════════
 // RISK CLASSIFICATION ENGINE
 // Combines absolute bad-order COUNT with the
@@ -159,7 +176,7 @@ app.post("/webhooks/orders/create", express.raw({ type: "*/*" }), async (req, re
       return;
     }
 
-    // Tag customer profile
+    // Tag customer profile — clean conflicting risk level first
     const custData = await shopifyRequest("GET", `customers/${customerId}.json?fields=id,tags`);
     const existingCustTags = custData.customer?.tags
       ? custData.customer.tags.split(",").map(t => t.trim()).filter(Boolean)
@@ -167,7 +184,7 @@ app.post("/webhooks/orders/create", express.raw({ type: "*/*" }), async (req, re
     const newCustTags = [riskLevel];
     if (badOrders.some(o => o.financial_status === "voided")) newCustTags.push("voided-order");
     if (badOrders.some(o => o.financial_status === "refunded")) newCustTags.push("frequent-returns");
-    const mergedCustTags = [...new Set([...existingCustTags, ...newCustTags])];
+    const mergedCustTags = applyCleanCustomerRiskTags(existingCustTags, newCustTags);
 
     await shopifyRequest("PUT", `customers/${customerId}.json`, {
       customer: {
@@ -177,7 +194,7 @@ app.post("/webhooks/orders/create", express.raw({ type: "*/*" }), async (req, re
       },
     });
 
-    // Tag the new order
+    // Tag the new order — remove any conflicting risk tag first
     const orderTag = riskLevel === "high-risk"
       ? "Smart Returns - High Risk Order"
       : "Smart Returns - Medium Risk Order";
@@ -187,9 +204,10 @@ app.post("/webhooks/orders/create", express.raw({ type: "*/*" }), async (req, re
       ? orderData.order.tags.split(",").map(t => t.trim()).filter(Boolean)
       : [];
 
-    if (!existingOrderTags.includes(orderTag)) {
+    const cleanedOrderTags = applyCleanRiskTag(existingOrderTags, orderTag);
+    if (cleanedOrderTags.join(",") !== existingOrderTags.join(",")) {
       await shopifyRequest("PUT", `orders/${orderId}.json`, {
-        order: { id: orderId, tags: [...existingOrderTags, orderTag].join(", ") },
+        order: { id: orderId, tags: cleanedOrderTags.join(", ") },
       });
     }
 
@@ -210,6 +228,36 @@ app.get("/", (req, res) => {
 // ── Health ──
 app.get("/health", (req, res) => {
   res.json({ status: "ok", shop: SHOP, tokenSet: !!TOKEN });
+});
+
+// ── Cleanup: fix orders that have BOTH High Risk and Medium Risk tags ──
+// (leftover from before tag-replace logic was added)
+app.post("/api/cleanup-duplicate-tags", async (req, res) => {
+  try {
+    const data = await shopifyRequest("GET", `orders.json?status=any&limit=250&fields=id,name,tags`);
+    const orders = data.orders || [];
+
+    const fixed = [];
+    for (const order of orders) {
+      const tags = (order.tags || "").split(",").map(t => t.trim()).filter(Boolean);
+      const hasHigh = tags.includes("Smart Returns - High Risk Order");
+      const hasMedium = tags.includes("Smart Returns - Medium Risk Order");
+
+      if (hasHigh && hasMedium) {
+        // Keep High Risk, drop Medium (High always wins)
+        const cleaned = tags.filter(t => t !== "Smart Returns - Medium Risk Order");
+        await shopifyRequest("PUT", `orders/${order.id}.json`, {
+          order: { id: order.id, tags: cleaned.join(", ") },
+        });
+        fixed.push(order.name);
+      }
+    }
+
+    res.json({ scanned: orders.length, fixed: fixed.length, fixedOrders: fixed });
+  } catch (e) {
+    console.error("Cleanup error:", e.message);
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // ── Orders ──
@@ -352,7 +400,7 @@ app.post("/api/scan-high-risk", async (req, res) => {
           ? custData.customer.tags.split(",").map(t => t.trim()).filter(Boolean)
           : [];
 
-        const merged = [...new Set([...existing, ...tags])];
+        const merged = applyCleanCustomerRiskTags(existing, tags);
 
         // Update customer tags
         await shopifyRequest("PUT", `customers/${cid}.json`, {
@@ -363,7 +411,7 @@ app.post("/api/scan-high-risk", async (req, res) => {
           },
         });
 
-        // Also tag all NEW (non-bad) orders from this customer as risky
+        // Also tag all NEW (non-bad) orders from this customer as risky — clean conflicting tag first
         const newOrders = orders.filter(o =>
           o.customer?.legacyResourceId === cid &&
           !c.badOrders.includes(o.name)
@@ -375,10 +423,10 @@ app.post("/api/scan-high-risk", async (req, res) => {
             ? existingOrder.order.tags.split(",").map(t => t.trim()).filter(Boolean)
             : [];
           const riskTag = riskLevel === "high-risk" ? "Smart Returns - High Risk Order" : "Smart Returns - Medium Risk Order";
-          if (!existingOrderTags.includes(riskTag)) {
-            existingOrderTags.push(riskTag);
+          const cleanedOrderTags = applyCleanRiskTag(existingOrderTags, riskTag);
+          if (cleanedOrderTags.join(",") !== existingOrderTags.join(",")) {
             await shopifyRequest("PUT", `orders/${orderId}.json`, {
-              order: { id: orderId, tags: existingOrderTags.join(", ") },
+              order: { id: orderId, tags: cleanedOrderTags.join(", ") },
             });
           }
         }
