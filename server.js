@@ -54,6 +54,65 @@ function shopifyGQL(query) {
   return shopifyRequest("POST", "graphql.json", { query });
 }
 
+// ════════════════════════════════════════════════
+// RISK CLASSIFICATION ENGINE
+// Combines absolute bad-order COUNT with the
+// customer's success RATE so high-volume good
+// customers aren't unfairly flagged.
+// ════════════════════════════════════════════════
+//
+// Rules:
+//  - HIGH RISK   → badCount >= 3   OR   successRate < 70%  (with totalOrders >= 2)
+//  - MEDIUM RISK → badCount === 2  OR   successRate < 85%  (with totalOrders >= 2)
+//  - SAFE        → otherwise (e.g. 3 bad out of 10 = 70% success = NOT risky)
+//
+// successRate = (totalOrders - badCount) / totalOrders * 100
+//
+function classifyRisk(totalOrders, badCount) {
+  if (badCount === 0 || totalOrders === 0) {
+    return { riskLevel: null, successRate: 100 };
+  }
+
+  const successRate = ((totalOrders - badCount) / totalOrders) * 100;
+
+  // Need at least 2 orders for percentage-based logic to mean anything;
+  // for brand-new customers (1-2 orders) fall back to pure count rules.
+  const enoughVolume = totalOrders >= 5;
+
+  let riskLevel = null;
+
+  if (badCount >= 3) {
+    // 3+ bad orders is always concerning UNLESS volume is high and rate is still good
+    if (enoughVolume && successRate >= 70) {
+      riskLevel = "medium-risk"; // high volume, decent success rate — downgrade
+    } else {
+      riskLevel = "high-risk";
+    }
+  } else if (badCount === 2) {
+    if (enoughVolume && successRate >= 85) {
+      riskLevel = null; // plenty of orders, still 85%+ success — safe
+    } else {
+      riskLevel = "medium-risk";
+    }
+  } else if (badCount === 1) {
+    if (enoughVolume && successRate >= 85) {
+      riskLevel = null; // one-off issue, high volume good customer — safe
+    } else {
+      riskLevel = "medium-risk";
+    }
+  }
+
+  // Percentage override: very poor success rate always pushes to high-risk
+  // regardless of count (catches low-volume serial cancelers fast)
+  if (totalOrders >= 2 && successRate < 70) {
+    riskLevel = "high-risk";
+  } else if (totalOrders >= 2 && successRate < 85 && riskLevel === null) {
+    riskLevel = "medium-risk";
+  }
+
+  return { riskLevel, successRate: Math.round(successRate * 10) / 10 };
+}
+
 // ── Express app ──
 const app = express();
 
@@ -82,7 +141,8 @@ app.post("/webhooks/orders/create", express.raw({ type: "*/*" }), async (req, re
     );
 
     const history = historyData.orders || [];
-    console.log(`Customer ${customerId}: ${history.length} orders in last 90 days`);
+    const totalOrders = history.length;
+    console.log(`Customer ${customerId}: ${totalOrders} orders in last 90 days`);
 
     // Bad orders = voided or refunded, excluding current order
     const badOrders = history.filter(o =>
@@ -90,12 +150,12 @@ app.post("/webhooks/orders/create", express.raw({ type: "*/*" }), async (req, re
       (o.financial_status === "voided" || o.financial_status === "refunded")
     );
     const badCount = badOrders.length;
-    const riskLevel = badCount >= 2 ? "high-risk" : badCount === 1 ? "medium-risk" : null;
+    const { riskLevel, successRate } = classifyRisk(totalOrders, badCount);
 
-    console.log(`Customer ${customerId}: ${badCount} bad orders → ${riskLevel || "safe"}`);
+    console.log(`Customer ${customerId}: ${badCount}/${totalOrders} bad (${successRate}% success) → ${riskLevel || "safe"}`);
 
     if (!riskLevel) {
-      console.log(`✅ Order ${orderName} — customer safe, no tag needed`);
+      console.log(`✅ Order ${orderName} — customer safe (${successRate}% success rate), no tag needed`);
       return;
     }
 
@@ -270,9 +330,7 @@ app.post("/api/scan-high-risk", async (req, res) => {
       }
     }
 
-    // Determine risk level per customer
-    // HIGH RISK: 2+ unique bad orders in 3 months
-    // MEDIUM RISK: 1 bad order
+    // Determine risk level per customer — combines count + success rate
     const results = [];
     for (const [cid, c] of Object.entries(customerMap)) {
       // Deduplicate bad orders
@@ -280,7 +338,9 @@ app.post("/api/scan-high-risk", async (req, res) => {
       const badCount = c.badOrders.length;
       if (badCount === 0) continue;
 
-      let riskLevel = badCount >= 2 ? "high-risk" : "medium-risk";
+      const { riskLevel, successRate } = classifyRisk(c.totalOrders, badCount);
+      if (!riskLevel) continue; // safe despite having some bad orders (good success rate)
+
       let tags = [riskLevel];
       if (c.voidedCount > 0) tags.push("voided-order");
       if (c.refundedCount > 0) tags.push("frequent-returns");
@@ -299,11 +359,11 @@ app.post("/api/scan-high-risk", async (req, res) => {
           customer: {
             id: cid,
             tags: merged.join(", "),
-            note: `⚠️ Auto-flagged: ${badCount} voided/refunded order(s) in last 90 days. Orders: ${[...new Set(c.badOrders)].join(", ")}`,
+            note: `⚠️ Auto-flagged: ${badCount}/${c.totalOrders} bad orders (${successRate}% success rate) in last 90 days. Orders: ${[...new Set(c.badOrders)].join(", ")}`,
           },
         });
 
-        // Also tag all NEW (non-bad) orders from this customer as high-risk
+        // Also tag all NEW (non-bad) orders from this customer as risky
         const newOrders = orders.filter(o =>
           o.customer?.legacyResourceId === cid &&
           !c.badOrders.includes(o.name)
@@ -314,7 +374,7 @@ app.post("/api/scan-high-risk", async (req, res) => {
           const existingOrderTags = existingOrder.order?.tags
             ? existingOrder.order.tags.split(",").map(t => t.trim()).filter(Boolean)
             : [];
-          const riskTag = badCount >= 2 ? "Smart Returns - High Risk Order" : "Smart Returns - Medium Risk Order";
+          const riskTag = riskLevel === "high-risk" ? "Smart Returns - High Risk Order" : "Smart Returns - Medium Risk Order";
           if (!existingOrderTags.includes(riskTag)) {
             existingOrderTags.push(riskTag);
             await shopifyRequest("PUT", `orders/${orderId}.json`, {
@@ -339,6 +399,7 @@ app.post("/api/scan-high-risk", async (req, res) => {
           voidedCount: c.voidedCount,
           refundedCount: c.refundedCount,
           badCount,
+          successRate,
           badOrders: c.badOrders,
           riskLevel,
           tags: merged,
@@ -433,85 +494,10 @@ app.get("/api/analytics", async (req, res) => {
 // ════════════════════════════════════════════════
 // AUTO-TAG ENGINE
 // Fires on every new order via Shopify webhook
-// Checks customer's last 90 days → tags instantly
+// (Webhook handler above contains the live logic;
+//  these were superseded by classifyRisk() + the
+//  inline webhook handler at the top of this file.)
 // ════════════════════════════════════════════════
-
-// ── Core risk checker: given a customerId, analyse 90-day history ──
-async function analyseCustomerRisk(customerId) {
-  const since = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
-  const data = await shopifyGQL(`{
-    orders(first: 250, query: "customer_id:${customerId} created_at:>='${since}'") {
-      edges { node {
-        id
-        name
-        displayFinancialStatus
-        refunds { id }
-      }}
-    }
-  }`);
-
-  if (data.errors) throw new Error(data.errors[0].message);
-  const orders = data.data.orders.edges.map(e => e.node);
-
-  let voidedCount = 0, refundedCount = 0;
-  const badOrders = [];
-
-  for (const o of orders) {
-    const status = (o.displayFinancialStatus || "").toLowerCase();
-    if (status === "voided") { voidedCount++; badOrders.push(o.name); }
-    if (status === "refunded" || o.refunds?.length > 0) { refundedCount++; badOrders.push(o.name); }
-  }
-
-  const badCount = voidedCount + refundedCount;
-  const riskLevel = badCount >= 2 ? "high-risk" : badCount === 1 ? "medium-risk" : null;
-
-  return { totalOrders: orders.length, voidedCount, refundedCount, badCount, badOrders: [...new Set(badOrders)], riskLevel };
-}
-
-// ── Apply tags to customer + new order ──
-async function applyRiskTags(customerId, newOrderId, risk) {
-  const { riskLevel, badCount, badOrders, voidedCount, refundedCount } = risk;
-  if (!riskLevel) return; // safe customer — no tagging
-
-  // 1. Tag the customer profile
-  const custData = await shopifyRequest("GET", `customers/${customerId}.json`);
-  const existing = custData.customer?.tags
-    ? custData.customer.tags.split(",").map(t => t.trim()).filter(Boolean)
-    : [];
-
-  const newTags = [riskLevel];
-  if (voidedCount > 0) newTags.push("voided-order");
-  if (refundedCount > 0) newTags.push("frequent-returns");
-  const merged = [...new Set([...existing, ...newTags])];
-
-  await shopifyRequest("PUT", `customers/${customerId}.json`, {
-    customer: {
-      id: customerId,
-      tags: merged.join(", "),
-      note: `⚠️ Auto-flagged by Smart Return Furor: ${badCount} voided/refunded order(s) in last 90 days. Bad orders: ${badOrders.join(", ")}`,
-    },
-  });
-
-  // 2. Tag the new order
-  const orderTag = riskLevel === "high-risk"
-    ? "Smart Returns - High Risk Order"
-    : "Smart Returns - Medium Risk Order";
-
-  const orderData = await shopifyRequest("GET", `orders/${newOrderId}.json?fields=id,tags`);
-  const existingOrderTags = orderData.order?.tags
-    ? orderData.order.tags.split(",").map(t => t.trim()).filter(Boolean)
-    : [];
-
-  if (!existingOrderTags.includes(orderTag)) {
-    existingOrderTags.push(orderTag);
-    await shopifyRequest("PUT", `orders/${newOrderId}.json`, {
-      order: { id: newOrderId, tags: existingOrderTags.join(", ") },
-    });
-  }
-
-  console.log(`✅ Auto-tagged order ${newOrderId} and customer ${customerId} as ${riskLevel}`);
-  return { riskLevel, orderTag, customerTags: merged };
-}
 
 // ── Webhook registered above before express.json() ──
 

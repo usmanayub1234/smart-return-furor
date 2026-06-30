@@ -483,7 +483,7 @@ select.form-control option{background:var(--surface2);}
     </div>
     <div style="overflow-x:auto">
       <table class="data-table">
-        <thead><tr><th>Bad Orders</th><th>Customer</th><th>Total Orders</th><th>Voided</th><th>Returned</th><th>Risk Level</th><th>Flags</th></tr></thead>
+        <thead><tr><th>Bad Orders</th><th>Customer</th><th>Total Orders</th><th>Voided</th><th>Returned</th><th>Success Rate</th><th>Risk Level</th><th>Flags</th></tr></thead>
         <tbody id="flagged-tbody">
           <tr><td colspan="7"><div class="empty"><span class="empty-icon">🔍</span><h3>Run a scan first</h3><p>Click "Scan & Auto-Tag" to detect risky customers</p></div></td></tr>
         </tbody>
@@ -620,15 +620,39 @@ select.form-control option{background:var(--surface2);}
   <div class="card">
     <div class="card-head"><div class="card-title"><span class="material-symbols-rounded" style="color:var(--red)">rule</span> Risk Thresholds</div></div>
     <div class="card-body">
+      <div class="alert info" style="margin-bottom:20px">
+        <div class="alert-icon">💡</div>
+        <div>
+          <strong>How Risk is Calculated</strong>
+          <span>Risk combines <strong>bad order count</strong> with <strong>success rate</strong> (good orders ÷ total orders). A customer with 10 orders and 3 cancellations has a 70% success rate — they are <strong>NOT</strong> flagged as high risk since most orders succeed. But a customer with 3 orders and 3 cancellations (0% success) is immediately High Risk.</span>
+        </div>
+      </div>
+
       <div class="form-group">
-        <label class="form-label">🔴 High Risk — flag after X bad orders in 90 days</label>
-        <input type="number" class="form-control" id="rule-high" value="2" min="1" max="10" style="max-width:120px">
+        <label class="form-label">🔴 High Risk — triggers when EITHER is true:</label>
+        <ul style="font-size:13px;color:var(--sub);line-height:2;padding-left:20px">
+          <li><strong>3+ bad orders</strong> AND success rate below 70% (low volume customers)</li>
+          <li><strong>Success rate below 70%</strong> with 2+ total orders (catches serial cancelers fast, regardless of volume)</li>
+        </ul>
       </div>
       <div class="form-group">
-        <label class="form-label">🟡 Medium Risk — flag after X bad orders in 90 days</label>
-        <input type="number" class="form-control" id="rule-medium" value="1" min="1" max="10" style="max-width:120px">
+        <label class="form-label">🟡 Medium Risk — triggers when EITHER is true:</label>
+        <ul style="font-size:13px;color:var(--sub);line-height:2;padding-left:20px">
+          <li><strong>1-2 bad orders</strong> with success rate between 70-85%</li>
+          <li>High volume customer (5+ orders) with 3+ bad orders but still 70%+ success rate</li>
+        </ul>
       </div>
+      <div class="form-group">
+        <label class="form-label">✅ Safe — no flag when:</label>
+        <ul style="font-size:13px;color:var(--sub);line-height:2;padding-left:20px">
+          <li>Success rate is 85%+ (even with 1-2 bad orders, if volume is high)</li>
+          <li>Example: 10 orders, 3 cancelled = 70% success → flagged Medium, not High</li>
+          <li>Example: 10 orders, 1 cancelled = 90% success → Safe, no flag</li>
+        </ul>
+      </div>
+
       <div class="divider"></div>
+
       <div class="form-group">
         <label class="form-label">High Risk Order Tag</label>
         <input type="text" class="form-control" id="rule-tag-high" value="Smart Returns - High Risk Order" style="max-width:400px">
@@ -1004,11 +1028,13 @@ function renderFlagged() {
            : activeFilter==='cancelled' ? scanResults.filter(c=>c.voidedCount>0)
            : scanResults;
   if (!rows.length) {
-    tbody.innerHTML = `<tr><td colspan="7"><div class="empty"><span class="empty-icon">✅</span><h3>No results in this filter</h3></div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8"><div class="empty"><span class="empty-icon">✅</span><h3>No results in this filter</h3></div></td></tr>`;
     return;
   }
-  const bad = c => c.badCount || (c.voidedCount + c.refundedCount);
-  tbody.innerHTML = rows.map(c => `<tr>
+  tbody.innerHTML = rows.map(c => {
+    const rate = c.successRate ?? (c.totalOrders ? Math.round(((c.totalOrders - c.badCount) / c.totalOrders) * 1000) / 10 : 100);
+    const rateColor = rate >= 85 ? 'var(--green)' : rate >= 70 ? 'var(--yellow)' : 'var(--red)';
+    return `<tr>
     <td><strong>${c.badOrders.join(', ')}</strong></td>
     <td>
       <a href="https://${window._shop||'your-store.myshopify.com'}/admin/customers/${c.customerId}" 
@@ -1023,15 +1049,16 @@ function renderFlagged() {
     <td style="color:var(--sub)">${c.totalOrders}</td>
     <td><strong style="color:var(--red)">${c.voidedCount}</strong></td>
     <td><strong style="color:var(--yellow)">${c.refundedCount}</strong></td>
+    <td><strong style="color:${rateColor}">${rate}%</strong></td>
     <td>${riskBadge(c.riskLevel)}</td>
     <td>
       ${c.voidedCount>0?`<span class="flag red">${c.voidedCount} Voided</span>`:''}
       ${c.refundedCount>0?`<span class="flag yellow">${c.refundedCount} Returned</span>`:''}
-      <span class="flag purple">${c.totalOrders?Math.round(bad(c)/c.totalOrders*100):0}% Cancel</span>
       ${c.riskLevel==='medium-risk'?`<span class="flag blue">⚠️ Watch</span>`:''}
       ${c.riskLevel==='high-risk'?`<span class="flag red">🚫 Block</span>`:''}
     </td>
-  </tr>`).join('');
+  </tr>`;
+  }).join('');
 }
 
 // ── Risky Customers ──
@@ -1099,8 +1126,6 @@ async function submitReturn() {
 // ── Rules ──
 function saveRules() {
   localStorage.setItem('srf-rules', JSON.stringify({
-    highThreshold: document.getElementById('rule-high').value,
-    mediumThreshold: document.getElementById('rule-medium').value,
     tagHigh: document.getElementById('rule-tag-high').value,
     tagMedium: document.getElementById('rule-tag-medium').value,
   }));
