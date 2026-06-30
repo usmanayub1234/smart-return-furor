@@ -500,13 +500,6 @@ select.form-control option{background:var(--surface2);}
         <span style="font-size:12px;color:var(--yellow);font-weight:700" id="medium-count-label"></span>
       </div>
       <div class="card-body">
-        <div class="alert warning" style="margin-bottom:16px">
-          <div class="alert-icon">⚠️</div>
-          <div>
-            <strong>What is Medium Risk?</strong>
-            <span>These customers have <strong>1 voided or refunded order</strong> in the last 90 days. They are being watched — one more bad order will automatically upgrade them to <strong>High Risk 🔴</strong>.</span>
-          </div>
-        </div>
         <div style="overflow-x:auto">
           <table class="data-table">
             <thead><tr><th>Customer</th><th>Bad Order</th><th>Total Orders</th><th>Type</th><th>Action Required</th></tr></thead>
@@ -620,35 +613,17 @@ select.form-control option{background:var(--surface2);}
   <div class="card">
     <div class="card-head"><div class="card-title"><span class="material-symbols-rounded" style="color:var(--red)">rule</span> Risk Thresholds</div></div>
     <div class="card-body">
-      <div class="alert info" style="margin-bottom:20px">
-        <div class="alert-icon">💡</div>
-        <div>
-          <strong>How Risk is Calculated</strong>
-          <span>Risk combines <strong>bad order count</strong> with <strong>success rate</strong> (good orders ÷ total orders). A customer with 10 orders and 3 cancellations has a 70% success rate — they are <strong>NOT</strong> flagged as high risk since most orders succeed. But a customer with 3 orders and 3 cancellations (0% success) is immediately High Risk.</span>
-        </div>
-      </div>
-
       <div class="form-group">
-        <label class="form-label">🔴 High Risk — triggers when EITHER is true:</label>
-        <ul style="font-size:13px;color:var(--sub);line-height:2;padding-left:20px">
-          <li><strong>3+ bad orders</strong> AND success rate below 70% (low volume customers)</li>
-          <li><strong>Success rate below 70%</strong> with 2+ total orders (catches serial cancelers fast, regardless of volume)</li>
-        </ul>
+        <label class="form-label">🔴 High Risk</label>
+        <p style="font-size:13px;color:var(--sub)">3+ bad orders in 90 days, or success rate below 70%</p>
       </div>
       <div class="form-group">
-        <label class="form-label">🟡 Medium Risk — triggers when EITHER is true:</label>
-        <ul style="font-size:13px;color:var(--sub);line-height:2;padding-left:20px">
-          <li><strong>1-2 bad orders</strong> with success rate between 70-85%</li>
-          <li>High volume customer (5+ orders) with 3+ bad orders but still 70%+ success rate</li>
-        </ul>
+        <label class="form-label">🟡 Medium Risk</label>
+        <p style="font-size:13px;color:var(--sub)">1–2 bad orders with success rate between 70–85%</p>
       </div>
       <div class="form-group">
-        <label class="form-label">✅ Safe — no flag when:</label>
-        <ul style="font-size:13px;color:var(--sub);line-height:2;padding-left:20px">
-          <li>Success rate is 85%+ (even with 1-2 bad orders, if volume is high)</li>
-          <li>Example: 10 orders, 3 cancelled = 70% success → flagged Medium, not High</li>
-          <li>Example: 10 orders, 1 cancelled = 90% success → Safe, no flag</li>
-        </ul>
+        <label class="form-label">✅ Safe</label>
+        <p style="font-size:13px;color:var(--sub)">Success rate 85%+ with strong order history</p>
       </div>
 
       <div class="divider"></div>
@@ -670,10 +645,6 @@ select.form-control option{background:var(--surface2);}
   <div class="card">
     <div class="card-head"><div class="card-title"><span class="material-symbols-rounded" style="color:var(--yellow)">cleaning_services</span> Fix Duplicate Tags</div></div>
     <div class="card-body">
-      <div class="alert warning" style="margin-bottom:16px">
-        <div class="alert-icon">⚠️</div>
-        <div><strong>One-time cleanup</strong><span>If any order has both "High Risk" and "Medium Risk" tags from before the fix, run this to clean them up. High Risk always wins.</span></div>
-      </div>
       <button class="btn btn-outline" id="cleanup-btn" onclick="runCleanup()">
         <span class="material-symbols-rounded">cleaning_services</span> Scan & Fix Duplicate Tags
       </button>
@@ -842,21 +813,26 @@ async function loadAnalytics() {
     document.getElementById('a-rate').textContent = d.returnRate + '%';
     document.getElementById('a-amount').textContent = '$' + d.refundAmount;
     document.getElementById('f-cancelled').textContent = d.totalRefunds;
-    if (d.totalOrders > 0) {
-      const pi = document.getElementById('perf-insight');
-      pi.style.display = 'flex';
-      const high = scanResults.filter(c=>c.riskLevel==='high-risk').length;
-      const med = scanResults.filter(c=>c.riskLevel==='medium-risk').length;
-      document.getElementById('insight-body').innerHTML =
-        `Your app has identified <strong>${high} high-risk</strong> and <strong>${med} medium-risk</strong> entities this period. ` +
-        `Return rate: <strong>${d.returnRate}%</strong>. Total refunded: <strong>$${d.refundAmount}</strong>. ` +
-        `Catching these early helps protect your revenue from return fraud and policy abuse.`;
-    }
+    window._lastAnalytics = d; // cache for re-use when scan completes later
+    const high = scanResults.filter(c=>c.riskLevel==='high-risk').length;
+    const med = scanResults.filter(c=>c.riskLevel==='medium-risk').length;
+    updateInsightText(high, med);
     renderReasons('dash-reasons', d.topReasons);
     renderReasons('a-reasons', d.topReasons);
     renderProducts('a-products', d.topProducts);
     renderOffenders();
   } catch(e) { toast('Analytics error: ' + e.message, 'error'); }
+}
+
+function updateInsightText(high, med) {
+  const d = window._lastAnalytics;
+  if (!d || d.totalOrders === 0) return;
+  const pi = document.getElementById('perf-insight');
+  pi.style.display = 'flex';
+  document.getElementById('insight-body').innerHTML =
+    `Your app has identified <strong>${high} high-risk</strong> and <strong>${med} medium-risk</strong> entities this period. ` +
+    `Return rate: <strong>${d.returnRate}%</strong>. Total refunded: <strong>$${d.refundAmount}</strong>. ` +
+    `Catching these early helps protect your revenue from return fraud and policy abuse.`;
 }
 
 function renderReasons(id, items) {
@@ -998,6 +974,7 @@ async function runScan() {
     renderFlagged();
     renderOffenders();
     renderMediumRisk();
+    updateInsightText(high, med);
     prog.innerHTML = `✅ Scanned <strong>${d.scanned}</strong> orders · Found <strong>${d.flagged}</strong> risky customers · Orders tagged in Shopify`;
     toast(`Scan complete — ${d.flagged} customers flagged!`, 'success');
   } catch(e) {
@@ -1032,7 +1009,7 @@ function renderMediumRisk() {
       ${c.voidedCount>0?`<span class="flag yellow">Voided</span>`:''}
       ${c.refundedCount>0?`<span class="flag yellow">Refunded</span>`:''}
     </td>
-    <td><span class="flag yellow">⚠️ Monitor — 1 more bad order → 🔴 High Risk</span></td>
+    <td><span class="flag yellow">Watch</span></td>
   </tr>`).join('');
 }
 
@@ -1176,14 +1153,14 @@ async function checkWebhook() {
     const wh = d.webhooks?.[0];
     const el = document.getElementById('webhook-alert');
     if (wh) {
-      el.innerHTML = `<div class="alert success" style="margin-bottom:20px">
-        <div class="alert-icon">🔗</div>
-        <div><strong>Auto-Tag Webhook Active</strong><span>Every new order is automatically checked and tagged in real-time. Monitoring: ${wh.address}</span></div>
+      el.innerHTML = `<div style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--green);margin-bottom:16px">
+        <span style="width:7px;height:7px;background:var(--green);border-radius:50%;box-shadow:0 0 8px var(--green)"></span>
+        Auto-tag webhook active
       </div>`;
     } else {
-      el.innerHTML = `<div class="alert warning" style="margin-bottom:20px">
-        <div class="alert-icon">⚠️</div>
-        <div><strong>Webhook Not Active</strong><span>Restart the server to register the auto-tag webhook.</span></div>
+      el.innerHTML = `<div style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--yellow);margin-bottom:16px">
+        <span style="width:7px;height:7px;background:var(--yellow);border-radius:50%"></span>
+        Webhook not active — restart server
       </div>`;
     }
   } catch(e) { console.warn('Webhook check:', e.message); }
@@ -1197,9 +1174,9 @@ async function checkWebhook() {
     if (h.shop) window._shop = h.shop;
   } catch(e) {}
   await loadOrders();
-  await loadAnalytics();
   await checkWebhook();
-  await runScan();
+  await runScan();      // scan FIRST so scanResults is populated
+  await loadAnalytics(); // THEN render analytics/insight using scan data
 })();
 </script>
 </body>

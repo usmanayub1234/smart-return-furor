@@ -136,19 +136,21 @@ app.post("/webhooks/orders/create", express.raw({ type: "*/*" }), async (req, re
     console.log(`🔔 Webhook fired: Order ${orderName} (${orderId}) from customer ${customerId}`);
 
     // Get customer's last 90 days order history via REST
+    // NOTE: status=any does NOT reliably include cancelled orders in all API versions —
+    // we must explicitly fetch with no status filter and rely on financial_status instead
     const since = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
     const historyData = await shopifyRequest("GET",
-      `orders.json?customer_id=${customerId}&status=any&created_at_min=${since}&limit=250&fields=id,name,financial_status`
+      `orders.json?customer_id=${customerId}&status=any&created_at_min=${since}&limit=250&fields=id,name,financial_status,cancelled_at`
     );
 
     const history = historyData.orders || [];
     const totalOrders = history.length;
-    console.log(`Customer ${customerId}: ${totalOrders} orders in last 90 days`);
+    console.log(`Customer ${customerId}: ${totalOrders} orders in last 90 days — statuses: ${history.map(o=>o.financial_status).join(',')}`);
 
-    // Bad orders = voided or refunded, excluding current order
+    // Bad orders = voided, refunded, OR cancelled (cancelled_at set), excluding current order
     const badOrders = history.filter(o =>
       String(o.id) !== String(orderId) &&
-      (o.financial_status === "voided" || o.financial_status === "refunded")
+      (o.financial_status === "voided" || o.financial_status === "refunded" || !!o.cancelled_at)
     );
     const badCount = badOrders.length;
     const { riskLevel, successRate } = classifyRisk(totalOrders, badCount);
@@ -323,6 +325,7 @@ app.post("/api/scan-high-risk", async (req, res) => {
           name
           displayFinancialStatus
           createdAt
+          cancelledAt
           customer { legacyResourceId }
           refunds { id }
         }}
@@ -333,7 +336,7 @@ app.post("/api/scan-high-risk", async (req, res) => {
 
     const orders = data.data.orders.edges.map(e => e.node);
 
-    // Group by customer — count voided + refunded orders per customer
+    // Group by customer — count voided + refunded + cancelled orders per customer
     const customerMap = {};
     for (const order of orders) {
       if (!order.customer) continue;
@@ -351,12 +354,13 @@ app.post("/api/scan-high-risk", async (req, res) => {
       }
       customerMap[cid].totalOrders++;
       const status = (order.displayFinancialStatus || "").toLowerCase();
-      if (status === "voided") {
+      const isCancelled = !!order.cancelledAt;
+      if (status === "voided" || isCancelled) {
         customerMap[cid].voidedCount++;
         customerMap[cid].badOrders.push(order.name);
       }
-      // Only count refunded if NOT already counted as voided
-      if ((status === "refunded" || order.refunds?.length > 0) && status !== "voided") {
+      // Only count refunded if NOT already counted as voided/cancelled
+      else if (status === "refunded" || order.refunds?.length > 0) {
         customerMap[cid].refundedCount++;
         customerMap[cid].badOrders.push(order.name);
       }
