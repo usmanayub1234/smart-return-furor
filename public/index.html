@@ -739,7 +739,11 @@ function toast(msg, type = 'info') {
   setTimeout(() => el.remove(), 4000);
 }
 
-// ── API ──
+// ── Currency ──
+function fmt(amount) {
+  const num = parseFloat(amount || 0);
+  return 'Rs ' + num.toLocaleString('en-PK', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+}
 async function api(path, opts = {}) {
   const r = await fetch(path, opts);
   if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error || r.statusText); }
@@ -778,7 +782,7 @@ function renderOrdersTable() {
   el.innerHTML = rows.map(o => `<tr>
     <td><strong style="font-size:14px">${o.name}</strong></td>
     <td style="color:var(--sub)">${new Date(o.created_at).toLocaleDateString()}</td>
-    <td><strong>$${parseFloat(o.total_price||0).toFixed(2)}</strong></td>
+    <td><strong>${fmt(o.total_price)}</strong></td>
     <td>${statusBadge(o.financial_status)}</td>
     <td>${statusBadge(o.fulfillment_status||'unfulfilled')}</td>
     <td>${o.financial_status==='voided'||o.financial_status==='refunded' ? riskBadge('medium') : '<span style="color:var(--sub);font-size:12px">—</span>'}</td>
@@ -793,7 +797,7 @@ function renderDashOrders() {
   if (!flagged.length) { el.innerHTML = `<tr><td colspan="5"><div class="empty" style="padding:30px 0"><h3>No flagged orders 🎉</h3><p>All orders look healthy</p></div></td></tr>`; return; }
   el.innerHTML = flagged.map(o => `<tr>
     <td><strong>${o.name}</strong></td>
-    <td><strong>$${parseFloat(o.total_price||0).toFixed(2)}</strong></td>
+    <td><strong>${fmt(o.total_price)}</strong></td>
     <td>${statusBadge(o.financial_status)}</td>
     <td>${riskBadge(o.financial_status==='voided'?'high':'medium')}</td>
     <td><span class="flag red">${o.financial_status}</span></td>
@@ -807,11 +811,11 @@ async function loadAnalytics() {
     document.getElementById('d-total').textContent = d.totalOrders;
     document.getElementById('d-returns').textContent = d.totalRefunds;
     document.getElementById('d-rate').textContent = d.returnRate + '%';
-    document.getElementById('d-loss').textContent = '$' + d.refundAmount;
+    document.getElementById('d-loss').textContent = fmt(d.refundAmount);
     document.getElementById('a-orders').textContent = d.totalOrders;
     document.getElementById('a-returns').textContent = d.totalRefunds;
     document.getElementById('a-rate').textContent = d.returnRate + '%';
-    document.getElementById('a-amount').textContent = '$' + d.refundAmount;
+    document.getElementById('a-amount').textContent = fmt(d.refundAmount);
     document.getElementById('f-cancelled').textContent = d.totalRefunds;
     window._lastAnalytics = d; // cache for re-use when scan completes later
     const high = scanResults.filter(c=>c.riskLevel==='high-risk').length;
@@ -831,7 +835,7 @@ function updateInsightText(high, med) {
   pi.style.display = 'flex';
   document.getElementById('insight-body').innerHTML =
     `Your app has identified <strong>${high} high-risk</strong> and <strong>${med} medium-risk</strong> entities this period. ` +
-    `Return rate: <strong>${d.returnRate}%</strong>. Total refunded: <strong>$${d.refundAmount}</strong>. ` +
+    `Return rate: <strong>${d.returnRate}%</strong>. Total refunded: <strong>${fmt(d.refundAmount)}</strong>. ` +
     `Catching these early helps protect your revenue from return fraud and policy abuse.`;
 }
 
@@ -1068,7 +1072,7 @@ async function loadRiskyCustomers() {
       return `<tr>
         <td><strong>${c.first_name||''} ${c.last_name||''}</strong></td>
         <td>${c.orders_count||0}</td>
-        <td><strong>$${parseFloat(c.total_spent||0).toFixed(2)}</strong></td>
+        <td><strong>${fmt(c.total_spent)}</strong></td>
         <td>${tags.map(t=>`<span class="flag ${t==='high-risk'?'red':t==='medium-risk'?'yellow':'blue'}">${t}</span>`).join('')}</td>
         <td>${riskBadge(risk)}</td>
       </tr>`;
@@ -1171,7 +1175,11 @@ async function checkWebhook() {
   // Get store domain for customer profile links
   try {
     const h = await api('/health');
-    if (h.shop) window._shop = h.shop;
+    if (h.shop) {
+      window._shop = h.shop;
+      const storeName = h.shop.replace('.myshopify.com', '');
+      document.getElementById('store-name').textContent = '🏪 ' + storeName;
+    }
   } catch(e) {}
   await loadOrders();
   await checkWebhook();

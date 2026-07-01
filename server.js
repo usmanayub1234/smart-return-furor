@@ -14,7 +14,7 @@ const TOKEN = process.env.SHOPIFY_ACCESS_TOKEN;
 const API   = "2026-04";
 
 // ── Core HTTP helper using Node built-in https ──
-function shopifyRequest(method, urlPath, body = null) {
+function shopifyRequest(method, urlPath, body = null, retryCount = 0) {
   return new Promise((resolve, reject) => {
     const payload = body ? JSON.stringify(body) : null;
     const options = {
@@ -31,9 +31,25 @@ function shopifyRequest(method, urlPath, body = null) {
     const req = https.request(options, (res) => {
       let data = "";
       res.on("data", chunk => data += chunk);
-      res.on("end", () => {
+      res.on("end", async () => {
         try {
           const json = JSON.parse(data);
+
+          // Handle rate limiting with automatic retry + backoff
+          if (res.statusCode === 429 && retryCount < 5) {
+            const retryAfter = parseFloat(res.headers["retry-after"]) || 2;
+            const waitMs = Math.ceil(retryAfter * 1000) + retryCount * 500;
+            console.warn(`⏳ Rate limited on ${urlPath} — retrying in ${waitMs}ms (attempt ${retryCount + 1}/5)`);
+            await new Promise(r => setTimeout(r, waitMs));
+            try {
+              const result = await shopifyRequest(method, urlPath, body, retryCount + 1);
+              resolve(result);
+            } catch (e) {
+              reject(e);
+            }
+            return;
+          }
+
           if (res.statusCode >= 400) {
             reject(new Error(`Shopify ${res.statusCode}: ${JSON.stringify(json)}`));
           } else {
@@ -122,53 +138,61 @@ const app = express();
 app.post("/webhooks/orders/create", express.raw({ type: "*/*" }), async (req, res) => {
   res.sendStatus(200); // Always respond 200 immediately to Shopify
 
+  let order, customerId, orderId, orderName;
   try {
-    const order = JSON.parse(req.body.toString());
-    const customerId = order.customer?.id;
-    const orderId = order.id;
-    const orderName = order.name;
+    order = JSON.parse(req.body.toString());
+    customerId = order.customer?.id;
+    orderId = order.id;
+    orderName = order.name;
+  } catch (e) {
+    console.error("Webhook: failed to parse order JSON:", e.message);
+    return;
+  }
 
-    if (!customerId) {
-      console.log(`Webhook: Order ${orderName} has no customer — skipping`);
-      return;
-    }
+  if (!customerId) {
+    console.log(`Webhook: Order ${orderName} has no customer — skipping`);
+    return;
+  }
 
-    console.log(`🔔 Webhook fired: Order ${orderName} (${orderId}) from customer ${customerId}`);
+  console.log(`🔔 [${orderName}] Webhook fired for customer ${customerId}`);
 
-    // Get customer's last 90 days order history via REST
-    // NOTE: status=any does NOT reliably include cancelled orders in all API versions —
-    // we must explicitly fetch with no status filter and rely on financial_status instead
+  // ── Step 1: fetch order history ──
+  let history;
+  try {
     const since = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
     const historyData = await shopifyRequest("GET",
       `orders.json?customer_id=${customerId}&status=any&created_at_min=${since}&limit=250&fields=id,name,financial_status,cancelled_at`
     );
+    history = historyData.orders || [];
+    console.log(`✓ [${orderName}] Step 1 OK — fetched ${history.length} orders: ${history.map(o=>`${o.name}:${o.financial_status}${o.cancelled_at?'(cancelled)':''}`).join(', ')}`);
+  } catch (e) {
+    console.error(`✗ [${orderName}] Step 1 FAILED (fetch history):`, e.message);
+    return;
+  }
 
-    const history = historyData.orders || [];
-    const totalOrders = history.length;
-    console.log(`Customer ${customerId}: ${totalOrders} orders in last 90 days — statuses: ${history.map(o=>o.financial_status).join(',')}`);
+  const totalOrders = history.length;
+  const badOrders = history.filter(o =>
+    String(o.id) !== String(orderId) &&
+    (o.financial_status === "voided" || o.financial_status === "refunded" || !!o.cancelled_at)
+  );
+  const badCount = badOrders.length;
+  const { riskLevel, successRate } = classifyRisk(totalOrders, badCount);
 
-    // Bad orders = voided, refunded, OR cancelled (cancelled_at set), excluding current order
-    const badOrders = history.filter(o =>
-      String(o.id) !== String(orderId) &&
-      (o.financial_status === "voided" || o.financial_status === "refunded" || !!o.cancelled_at)
-    );
-    const badCount = badOrders.length;
-    const { riskLevel, successRate } = classifyRisk(totalOrders, badCount);
+  console.log(`📊 [${orderName}] ${badCount}/${totalOrders} bad (${successRate}% success) → ${riskLevel || "safe"}`);
 
-    console.log(`Customer ${customerId}: ${badCount}/${totalOrders} bad (${successRate}% success) → ${riskLevel || "safe"}`);
+  if (!riskLevel) {
+    console.log(`✅ [${orderName}] Customer safe — no tag needed`);
+    return;
+  }
 
-    if (!riskLevel) {
-      console.log(`✅ Order ${orderName} — customer safe (${successRate}% success rate), no tag needed`);
-      return;
-    }
-
-    // Tag customer profile — clean conflicting risk level first
+  // ── Step 2: tag customer ──
+  try {
     const custData = await shopifyRequest("GET", `customers/${customerId}.json?fields=id,tags`);
     const existingCustTags = custData.customer?.tags
       ? custData.customer.tags.split(",").map(t => t.trim()).filter(Boolean)
       : [];
     const newCustTags = [riskLevel];
-    if (badOrders.some(o => o.financial_status === "voided")) newCustTags.push("voided-order");
+    if (badOrders.some(o => o.financial_status === "voided" || !!o.cancelled_at)) newCustTags.push("voided-order");
     if (badOrders.some(o => o.financial_status === "refunded")) newCustTags.push("frequent-returns");
     const mergedCustTags = applyCleanCustomerRiskTags(existingCustTags, newCustTags);
 
@@ -179,8 +203,14 @@ app.post("/webhooks/orders/create", express.raw({ type: "*/*" }), async (req, re
         note: `⚠️ Auto-flagged: ${badCount} bad order(s) in 90 days: ${badOrders.map(o => o.name).join(", ")}`,
       },
     });
+    console.log(`✓ [${orderName}] Step 2 OK — customer tagged: ${mergedCustTags.join(", ")}`);
+  } catch (e) {
+    console.error(`✗ [${orderName}] Step 2 FAILED (tag customer ${customerId}):`, e.message);
+    // continue to step 3 anyway — order tag is still useful even if customer tag failed
+  }
 
-    // Tag the new order — remove any conflicting risk tag first
+  // ── Step 3: tag the order itself ──
+  try {
     const orderTag = riskLevel === "high-risk"
       ? "Smart Returns - High Risk Order"
       : "Smart Returns - Medium Risk Order";
@@ -196,11 +226,9 @@ app.post("/webhooks/orders/create", express.raw({ type: "*/*" }), async (req, re
         order: { id: orderId, tags: cleanedOrderTags.join(", ") },
       });
     }
-
-    console.log(`🚨 Auto-tagged ${orderName} as "${orderTag}" — ${badCount} bad prior orders`);
-
+    console.log(`🚨 [${orderName}] Step 3 OK — tagged as "${orderTag}"`);
   } catch (e) {
-    console.error("Webhook error:", e.message);
+    console.error(`✗ [${orderName}] Step 3 FAILED (tag order ${orderId}):`, e.message);
   }
 });
 
@@ -377,6 +405,9 @@ app.post("/api/scan-high-risk", async (req, res) => {
       const { riskLevel, successRate } = classifyRisk(c.totalOrders, badCount);
       if (!riskLevel) continue; // safe despite having some bad orders (good success rate)
 
+      // Small delay between customers to avoid bursting Shopify's REST rate limit
+      await new Promise(r => setTimeout(r, 150));
+
       let tags = [riskLevel];
       if (c.voidedCount > 0) tags.push("voided-order");
       if (c.refundedCount > 0) tags.push("frequent-returns");
@@ -405,6 +436,7 @@ app.post("/api/scan-high-risk", async (req, res) => {
           !c.badOrders.includes(o.name)
         );
         for (const newOrder of newOrders) {
+          await new Promise(r => setTimeout(r, 120));
           const orderId = newOrder.id.replace("gid://shopify/Order/", "");
           const existingOrder = await shopifyRequest("GET", `orders/${orderId}.json?fields=id,tags`);
           const existingOrderTags = existingOrder.order?.tags
