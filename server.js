@@ -89,45 +89,44 @@ function applyCleanCustomerRiskTags(existingTags, newRiskTags) {
 
 // ════════════════════════════════════════════════
 // RISK CLASSIFICATION ENGINE
-// Combines absolute bad-order COUNT with the
-// customer's success RATE so high-volume good
-// customers aren't unfairly flagged.
+//
+// Uses DELIVERY RATE (fulfilled orders ÷ total orders)
+// combined with voided/cancelled COUNT:
+//
+// Rule 1: 1 voided + delivery rate >= 70% → SAFE
+// Rule 2: 1 voided + delivery rate <  70% → MEDIUM RISK
+// Rule 3: 2 voided + delivery rate >= 70% → MEDIUM RISK
+// Rule 4: 2 voided + delivery rate <  70% → HIGH RISK
+// Rule 5: 3+ voided + delivery rate >= 70% → MEDIUM RISK
+// Rule 6: 3+ voided + delivery rate <  70% → HIGH RISK
+//
+// deliveryRate = fulfilledOrders / totalOrders * 100
 // ════════════════════════════════════════════════
-//
-// Rules (in priority order):
-//  1. badCount >= 3            → ALWAYS HIGH RISK (hard rule, no exceptions)
-//  2. successRate < 70%        → HIGH RISK (catches low-volume serial cancelers)
-//  3. badCount === 2           → MEDIUM RISK (unless successRate >= 85% with 5+ orders → safe)
-//  4. badCount === 1           → MEDIUM RISK (unless successRate >= 85% with 5+ orders → safe)
-//  5. otherwise                → SAFE
-//
-// successRate = (totalOrders - badCount) / totalOrders * 100
-//
-function classifyRisk(totalOrders, badCount) {
+function classifyRisk(totalOrders, badCount, deliveredCount) {
   if (badCount === 0 || totalOrders === 0) {
-    return { riskLevel: null, successRate: 100 };
+    return { riskLevel: null, deliveryRate: 100 };
   }
 
-  const successRate = ((totalOrders - badCount) / totalOrders) * 100;
-  const enoughVolume = totalOrders >= 5;
+  const deliveryRate = totalOrders > 0 ? (deliveredCount / totalOrders) * 100 : 0;
+  const goodDelivery = deliveryRate >= 70;
 
-  // RULE 1 — hard cap: 3+ bad orders is ALWAYS high risk, no percentage escape hatch
+  let riskLevel = null;
+
   if (badCount >= 3) {
-    return { riskLevel: "high-risk", successRate: Math.round(successRate * 10) / 10 };
+    // Rule 5: 3+ voided + good delivery = Medium Risk
+    // Rule 6: 3+ voided + bad delivery  = High Risk
+    riskLevel = goodDelivery ? "medium-risk" : "high-risk";
+  } else if (badCount === 2) {
+    // Rule 3: 2 voided + good delivery = Medium Risk
+    // Rule 4: 2 voided + bad delivery  = High Risk
+    riskLevel = goodDelivery ? "medium-risk" : "high-risk";
+  } else if (badCount === 1) {
+    // Rule 1: 1 voided + good delivery = Safe
+    // Rule 2: 1 voided + bad delivery  = Medium Risk
+    riskLevel = goodDelivery ? null : "medium-risk";
   }
 
-  // RULE 2 — very poor success rate is always high risk regardless of count
-  if (totalOrders >= 2 && successRate < 70) {
-    return { riskLevel: "high-risk", successRate: Math.round(successRate * 10) / 10 };
-  }
-
-  // RULE 3/4 — 1 or 2 bad orders: medium risk, unless high volume + high success rate
-  let riskLevel = "medium-risk";
-  if (enoughVolume && successRate >= 85) {
-    riskLevel = null; // good track record despite a hiccup — safe
-  }
-
-  return { riskLevel, successRate: Math.round(successRate * 10) / 10 };
+  return { riskLevel, deliveryRate: Math.round(deliveryRate * 10) / 10 };
 }
 
 // ── Express app ──
@@ -171,14 +170,25 @@ app.post("/webhooks/orders/create", express.raw({ type: "*/*" }), async (req, re
   }
 
   const totalOrders = history.length;
+
+  // Bad orders = voided, refunded, OR cancelled, excluding current new order
   const badOrders = history.filter(o =>
     String(o.id) !== String(orderId) &&
     (o.financial_status === "voided" || o.financial_status === "refunded" || !!o.cancelled_at)
   );
-  const badCount = badOrders.length;
-  const { riskLevel, successRate } = classifyRisk(totalOrders, badCount);
 
-  console.log(`📊 [${orderName}] ${badCount}/${totalOrders} bad (${successRate}% success) → ${riskLevel || "safe"}`);
+  // Delivered orders = fulfilled (not voided/cancelled/refunded), excluding current order
+  const deliveredOrders = history.filter(o =>
+    String(o.id) !== String(orderId) &&
+    o.financial_status === "paid" &&
+    !o.cancelled_at
+  );
+
+  const badCount = badOrders.length;
+  const deliveredCount = deliveredOrders.length;
+  const { riskLevel, deliveryRate } = classifyRisk(totalOrders, badCount, deliveredCount);
+
+  console.log(`📊 [${orderName}] ${badCount} bad, ${deliveredCount}/${totalOrders} delivered (${deliveryRate}% delivery rate) → ${riskLevel || "safe"}`);
 
   if (!riskLevel) {
     console.log(`✅ [${orderName}] Customer safe — no tag needed`);
@@ -364,7 +374,7 @@ app.post("/api/scan-high-risk", async (req, res) => {
 
     const orders = data.data.orders.edges.map(e => e.node);
 
-    // Group by customer — count voided + refunded + cancelled orders per customer
+    // Group by customer — count voided + refunded + cancelled + delivered orders per customer
     const customerMap = {};
     for (const order of orders) {
       if (!order.customer) continue;
@@ -377,24 +387,27 @@ app.post("/api/scan-high-risk", async (req, res) => {
           totalOrders: 0,
           voidedCount: 0,
           refundedCount: 0,
+          deliveredCount: 0,
           badOrders: [],
         };
       }
       customerMap[cid].totalOrders++;
       const status = (order.displayFinancialStatus || "").toLowerCase();
       const isCancelled = !!order.cancelledAt;
+
       if (status === "voided" || isCancelled) {
         customerMap[cid].voidedCount++;
         customerMap[cid].badOrders.push(order.name);
-      }
-      // Only count refunded if NOT already counted as voided/cancelled
-      else if (status === "refunded" || order.refunds?.length > 0) {
+      } else if (status === "refunded" || order.refunds?.length > 0) {
         customerMap[cid].refundedCount++;
         customerMap[cid].badOrders.push(order.name);
+      } else if (status === "paid") {
+        // Count paid (successfully delivered/fulfilled) orders
+        customerMap[cid].deliveredCount++;
       }
     }
 
-    // Determine risk level per customer — combines count + success rate
+    // Determine risk level per customer — delivery rate based
     const results = [];
     for (const [cid, c] of Object.entries(customerMap)) {
       // Deduplicate bad orders
@@ -402,10 +415,10 @@ app.post("/api/scan-high-risk", async (req, res) => {
       const badCount = c.badOrders.length;
       if (badCount === 0) continue;
 
-      const { riskLevel, successRate } = classifyRisk(c.totalOrders, badCount);
-      if (!riskLevel) continue; // safe despite having some bad orders (good success rate)
+      const { riskLevel, deliveryRate } = classifyRisk(c.totalOrders, badCount, c.deliveredCount);
+      if (!riskLevel) continue; // safe — good delivery rate despite some bad orders
 
-      // Small delay between customers to avoid bursting Shopify's REST rate limit
+      // Small delay between customers to avoid rate limit
       await new Promise(r => setTimeout(r, 150));
 
       let tags = [riskLevel];
@@ -426,7 +439,7 @@ app.post("/api/scan-high-risk", async (req, res) => {
           customer: {
             id: cid,
             tags: merged.join(", "),
-            note: `⚠️ Auto-flagged: ${badCount}/${c.totalOrders} bad orders (${successRate}% success rate) in last 90 days. Orders: ${[...new Set(c.badOrders)].join(", ")}`,
+            note: `⚠️ Auto-flagged: ${badCount}/${c.totalOrders} bad orders (${deliveryRate}% delivery rate) in last 90 days. Orders: ${[...new Set(c.badOrders)].join(", ")}`,
           },
         });
 
@@ -467,7 +480,7 @@ app.post("/api/scan-high-risk", async (req, res) => {
           voidedCount: c.voidedCount,
           refundedCount: c.refundedCount,
           badCount,
-          successRate,
+          deliveryRate,
           badOrders: c.badOrders,
           riskLevel,
           tags: merged,

@@ -483,7 +483,7 @@ select.form-control option{background:var(--surface2);}
     </div>
     <div style="overflow-x:auto">
       <table class="data-table">
-        <thead><tr><th>Bad Orders</th><th>Customer</th><th>Total Orders</th><th>Voided</th><th>Returned</th><th>Success Rate</th><th>Risk Level</th><th>Flags</th></tr></thead>
+        <thead><tr><th>Bad Orders</th><th>Customer</th><th>Total Orders</th><th>Voided</th><th>Returned</th><th>Delivery Rate</th><th>Risk Level</th><th>Flags</th></tr></thead>
         <tbody id="flagged-tbody">
           <tr><td colspan="7"><div class="empty"><span class="empty-icon">🔍</span><h3>Run a scan first</h3><p>Click "Scan & Auto-Tag" to detect risky customers</p></div></td></tr>
         </tbody>
@@ -615,15 +615,15 @@ select.form-control option{background:var(--surface2);}
     <div class="card-body">
       <div class="form-group">
         <label class="form-label">🔴 High Risk</label>
-        <p style="font-size:13px;color:var(--sub)">3+ bad orders in 90 days, or success rate below 70%</p>
+        <p style="font-size:13px;color:var(--sub)">2+ voided/cancelled AND delivery rate below 70%</p>
       </div>
       <div class="form-group">
         <label class="form-label">🟡 Medium Risk</label>
-        <p style="font-size:13px;color:var(--sub)">1–2 bad orders with success rate between 70–85%</p>
+        <p style="font-size:13px;color:var(--sub)">1 voided + below 70% delivery — OR — 2+ voided but still 70%+ delivery rate</p>
       </div>
       <div class="form-group">
         <label class="form-label">✅ Safe</label>
-        <p style="font-size:13px;color:var(--sub)">Success rate 85%+ with strong order history</p>
+        <p style="font-size:13px;color:var(--sub)">1 voided but 70%+ delivery rate (good customer, one-off issue)</p>
       </div>
 
       <div class="divider"></div>
@@ -1027,7 +1027,7 @@ function renderFlagged() {
     return;
   }
   tbody.innerHTML = rows.map(c => {
-    const rate = c.successRate ?? (c.totalOrders ? Math.round(((c.totalOrders - c.badCount) / c.totalOrders) * 1000) / 10 : 100);
+    const rate = c.deliveryRate ?? (c.totalOrders ? Math.round((c.deliveredCount / c.totalOrders) * 1000) / 10 : 100);
     const rateColor = rate >= 85 ? 'var(--green)' : rate >= 70 ? 'var(--yellow)' : 'var(--red)';
     return `<tr>
     <td><strong>${c.badOrders.join(', ')}</strong></td>
