@@ -643,6 +643,17 @@ select.form-control option{background:var(--surface2);}
   </div>
 
   <div class="card">
+    <div class="card-head"><div class="card-title"><span class="material-symbols-rounded" style="color:var(--blue)">published_with_changes</span> Re-evaluate Existing Tags</div></div>
+    <div class="card-body">
+      <p style="font-size:13px;color:var(--sub);margin-bottom:16px">Re-checks all already-tagged orders against the latest rules and corrects any wrong tags (e.g. High Risk → Medium Risk or removed if now safe).</p>
+      <button class="btn btn-primary" id="reeval-btn" onclick="runReeval()">
+        <span class="material-symbols-rounded">published_with_changes</span> Re-evaluate All Tagged Orders
+      </button>
+      <div id="reeval-result" style="margin-top:14px"></div>
+    </div>
+  </div>
+
+  <div class="card">
     <div class="card-head"><div class="card-title"><span class="material-symbols-rounded" style="color:var(--yellow)">cleaning_services</span> Fix Duplicate Tags</div></div>
     <div class="card-body">
       <button class="btn btn-outline" id="cleanup-btn" onclick="runCleanup()">
@@ -1125,6 +1136,34 @@ function saveRules() {
     tagMedium: document.getElementById('rule-tag-medium').value,
   }));
   toast('Rules saved successfully!', 'success');
+}
+
+async function runReeval() {
+  const btn = document.getElementById('reeval-btn');
+  const result = document.getElementById('reeval-result');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="material-symbols-rounded">hourglass_empty</span> Re-evaluating...';
+  result.innerHTML = '<div style="color:var(--sub);font-size:13px;font-weight:600">⏳ Fetching all tagged orders and re-checking against latest rules...</div>';
+  try {
+    const d = await api('/api/reevaluate-tags', { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' });
+    if (d.fixed === 0) {
+      result.innerHTML = `<div class="alert success"><div class="alert-icon">✅</div><div><strong>All tags are correct!</strong><span>Scanned ${d.scanned} tagged orders — all match latest rules.</span></div></div>`;
+    } else {
+      const rows = d.fixedOrders.map(o =>
+        `<tr><td><strong>${o.order}</strong></td><td style="color:var(--red)">${o.from}</td><td style="color:var(--green)">→ ${o.to}</td><td>${o.badOrders} bad / ${o.totalOrders} total</td><td>${o.deliveryRate}</td></tr>`
+      ).join('');
+      result.innerHTML = `
+        <div class="alert success" style="margin-bottom:12px"><div class="alert-icon">✅</div><div><strong>Fixed ${d.fixed} order(s)</strong><span>Tags corrected based on latest delivery rate rules.</span></div></div>
+        <table class="data-table"><thead><tr><th>Order</th><th>Was</th><th>Now</th><th>History</th><th>Delivery Rate</th></tr></thead><tbody>${rows}</tbody></table>`;
+    }
+    toast(`Re-evaluation complete — ${d.fixed} order(s) corrected`, 'success');
+  } catch(e) {
+    result.innerHTML = `<div style="color:var(--red);font-size:13px">❌ Error: ${e.message}</div>`;
+    toast('Re-evaluation failed: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<span class="material-symbols-rounded">published_with_changes</span> Re-evaluate All Tagged Orders';
+  }
 }
 
 async function runCleanup() {

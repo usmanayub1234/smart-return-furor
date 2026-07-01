@@ -268,7 +268,6 @@ app.post("/api/cleanup-duplicate-tags", async (req, res) => {
       const hasMedium = tags.includes("Smart Returns - Medium Risk Order");
 
       if (hasHigh && hasMedium) {
-        // Keep High Risk, drop Medium (High always wins)
         const cleaned = tags.filter(t => t !== "Smart Returns - Medium Risk Order");
         await shopifyRequest("PUT", `orders/${order.id}.json`, {
           order: { id: order.id, tags: cleaned.join(", ") },
@@ -280,6 +279,95 @@ app.post("/api/cleanup-duplicate-tags", async (req, res) => {
     res.json({ scanned: orders.length, fixed: fixed.length, fixedOrders: fixed });
   } catch (e) {
     console.error("Cleanup error:", e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ── Re-evaluate: recalculate risk for ALL already-tagged orders using latest rules ──
+app.post("/api/reevaluate-tags", async (req, res) => {
+  try {
+    // Fetch all orders that already have a Smart Returns tag
+    const [highData, medData] = await Promise.all([
+      shopifyRequest("GET", `orders.json?status=any&limit=250&tag=Smart+Returns+-+High+Risk+Order&fields=id,name,tags,customer_id,financial_status`),
+      shopifyRequest("GET", `orders.json?status=any&limit=250&tag=Smart+Returns+-+Medium+Risk+Order&fields=id,name,tags,customer_id,financial_status`),
+    ]);
+
+    const tagged = [
+      ...(highData.orders || []),
+      ...(medData.orders || []),
+    ];
+
+    // Deduplicate by order ID
+    const unique = Object.values(
+      Object.fromEntries(tagged.map(o => [o.id, o]))
+    );
+
+    const since = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+    const results = { scanned: unique.length, fixed: 0, fixedOrders: [] };
+
+    for (const order of unique) {
+      if (!order.customer_id) continue;
+      await new Promise(r => setTimeout(r, 200)); // rate limit protection
+
+      try {
+        // Fetch full customer history
+        const histData = await shopifyRequest("GET",
+          `orders.json?customer_id=${order.customer_id}&status=any&created_at_min=${since}&limit=250&fields=id,name,financial_status,cancelled_at`
+        );
+        const history = histData.orders || [];
+        const totalOrders = history.length;
+
+        const badOrders = history.filter(o =>
+          String(o.id) !== String(order.id) &&
+          (o.financial_status === "voided" || o.financial_status === "refunded" || !!o.cancelled_at)
+        );
+        const deliveredOrders = history.filter(o =>
+          String(o.id) !== String(order.id) &&
+          o.financial_status === "paid" && !o.cancelled_at
+        );
+
+        const { riskLevel, deliveryRate } = classifyRisk(totalOrders, badOrders.length, deliveredOrders.length);
+
+        const currentTags = (order.tags || "").split(",").map(t => t.trim()).filter(Boolean);
+        const hasHigh = currentTags.includes("Smart Returns - High Risk Order");
+        const hasMedium = currentTags.includes("Smart Returns - Medium Risk Order");
+
+        let newTag = null;
+        if (riskLevel === "high-risk") newTag = "Smart Returns - High Risk Order";
+        else if (riskLevel === "medium-risk") newTag = "Smart Returns - Medium Risk Order";
+
+        const currentRiskTag = hasHigh ? "Smart Returns - High Risk Order" : hasMedium ? "Smart Returns - Medium Risk Order" : null;
+
+        if (newTag !== currentRiskTag) {
+          // Tag needs updating
+          let updatedTags = currentTags.filter(t =>
+            t !== "Smart Returns - High Risk Order" && t !== "Smart Returns - Medium Risk Order"
+          );
+          if (newTag) updatedTags.push(newTag);
+
+          await shopifyRequest("PUT", `orders/${order.id}.json`, {
+            order: { id: order.id, tags: updatedTags.join(", ") },
+          });
+
+          results.fixed++;
+          results.fixedOrders.push({
+            order: order.name,
+            from: currentRiskTag || "none",
+            to: newTag || "removed (now safe)",
+            deliveryRate: deliveryRate + "%",
+            badOrders: badOrders.length,
+            totalOrders,
+          });
+          console.log(`✅ Re-evaluated ${order.name}: ${currentRiskTag} → ${newTag || "safe"} (${deliveryRate}% delivery)`);
+        }
+      } catch (e) {
+        console.warn(`Could not re-evaluate ${order.name}:`, e.message);
+      }
+    }
+
+    res.json(results);
+  } catch (e) {
+    console.error("Re-evaluate error:", e.message);
     res.status(500).json({ error: e.message });
   }
 });
