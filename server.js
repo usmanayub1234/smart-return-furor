@@ -93,12 +93,23 @@ function applyCleanCustomerRiskTags(existingTags, newRiskTags) {
 // Uses DELIVERY RATE (fulfilled orders ÷ total orders)
 // combined with voided/cancelled COUNT:
 //
-// Rule 1: 1 voided + delivery rate >= 70% → SAFE
-// Rule 2: 1 voided + delivery rate <  70% → MEDIUM RISK
-// Rule 3: 2 voided + delivery rate >= 70% → MEDIUM RISK
-// Rule 4: 2 voided + delivery rate <  70% → HIGH RISK
-// Rule 5: 3+ voided + delivery rate >= 70% → MEDIUM RISK
-// Rule 6: 3+ voided + delivery rate <  70% → HIGH RISK
+// Delivery Rate Thresholds:
+//   >= 70%        = Good delivery (safe-ish)
+//   50% to <70%   = Medium delivery
+//   < 50%         = Poor delivery (risky)
+//
+// Rules:
+//   1 voided + delivery >= 70%  → SAFE
+//   1 voided + delivery 50-70%  → MEDIUM RISK
+//   1 voided + delivery < 50%   → HIGH RISK
+//
+//   2 voided + delivery >= 70%  → MEDIUM RISK
+//   2 voided + delivery 50-70%  → MEDIUM RISK
+//   2 voided + delivery < 50%   → HIGH RISK
+//
+//   3+ voided + delivery >= 70% → MEDIUM RISK
+//   3+ voided + delivery 50-70% → MEDIUM RISK
+//   3+ voided + delivery < 50%  → HIGH RISK
 //
 // deliveryRate = fulfilledOrders / totalOrders * 100
 // ════════════════════════════════════════════════
@@ -108,22 +119,17 @@ function classifyRisk(totalOrders, badCount, deliveredCount) {
   }
 
   const deliveryRate = totalOrders > 0 ? (deliveredCount / totalOrders) * 100 : 0;
-  const goodDelivery = deliveryRate >= 70;
 
   let riskLevel = null;
 
-  if (badCount >= 3) {
-    // Rule 5: 3+ voided + good delivery = Medium Risk
-    // Rule 6: 3+ voided + bad delivery  = High Risk
-    riskLevel = goodDelivery ? "medium-risk" : "high-risk";
-  } else if (badCount === 2) {
-    // Rule 3: 2 voided + good delivery = Medium Risk
-    // Rule 4: 2 voided + bad delivery  = High Risk
-    riskLevel = goodDelivery ? "medium-risk" : "high-risk";
-  } else if (badCount === 1) {
-    // Rule 1: 1 voided + good delivery = Safe
-    // Rule 2: 1 voided + bad delivery  = Medium Risk
-    riskLevel = goodDelivery ? null : "medium-risk";
+  if (badCount === 1) {
+    if (deliveryRate >= 70)      riskLevel = null;          // Safe
+    else if (deliveryRate >= 50) riskLevel = "medium-risk"; // Medium
+    else                         riskLevel = "high-risk";   // High
+  } else {
+    // 2+ voided — delivery rate decides Medium vs High
+    if (deliveryRate >= 50) riskLevel = "medium-risk"; // Medium
+    else                    riskLevel = "high-risk";   // High
   }
 
   return { riskLevel, deliveryRate: Math.round(deliveryRate * 10) / 10 };
