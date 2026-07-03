@@ -378,43 +378,64 @@ app.post("/api/reevaluate-tags", async (req, res) => {
   }
 });
 
-// ── Orders ──
+// ── Orders — ALL last 90 days with pagination ──
 app.get("/api/orders", async (req, res) => {
   try {
-    const data = await shopifyGQL(`{
-      orders(first: 50, query: "status:any") {
-        edges { node {
-          id name createdAt
-          displayFinancialStatus displayFulfillmentStatus
-          totalPriceSet { shopMoney { amount } }
-          customer { id legacyResourceId }
-          lineItems(first: 10) { edges { node {
-            id title variantTitle quantity
-            originalUnitPriceSet { shopMoney { amount } }
-          }}}
-        }}
-      }
-    }`);
+    const since = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+    const allOrders = [];
+    let cursor = null;
+    let hasNextPage = true;
 
-    if (data.errors) throw new Error(data.errors[0].message);
+    while (hasNextPage) {
+      const afterClause = cursor ? `, after: "${cursor}"` : "";
+      const data = await shopifyGQL(`{
+        orders(first: 250${afterClause}, query: "status:any created_at:>='${since}'") {
+          pageInfo { hasNextPage endCursor }
+          edges { node {
+            id name createdAt
+            displayFinancialStatus displayFulfillmentStatus
+            cancelledAt
+            totalPriceSet { shopMoney { amount } }
+            customer { id legacyResourceId }
+            lineItems(first: 10) { edges { node {
+              id title variantTitle quantity
+              originalUnitPriceSet { shopMoney { amount } }
+            }}}
+          }}
+        }
+      }`);
 
-    const orders = data.data.orders.edges.map(({ node: o }) => ({
-      id:                 o.id.replace("gid://shopify/Order/", ""),
-      name:               o.name,
-      created_at:         o.createdAt,
-      customer_id:        o.customer?.legacyResourceId || null,
-      financial_status:   (o.displayFinancialStatus || "").toLowerCase().replace(/_/g, " "),
-      fulfillment_status: (o.displayFulfillmentStatus || "unfulfilled").toLowerCase().replace(/_/g, " "),
-      total_price:        o.totalPriceSet?.shopMoney?.amount || "0",
-      line_items:         o.lineItems.edges.map(({ node: li }) => ({
-        id:            li.id.replace("gid://shopify/LineItem/", ""),
-        title:         li.title,
-        variant_title: li.variantTitle,
-        quantity:      li.quantity,
-        price:         li.originalUnitPriceSet?.shopMoney?.amount || "0",
-      })),
-    }));
-    res.json(orders);
+      if (data.errors) throw new Error(data.errors[0].message);
+
+      const page = data.data.orders;
+      const mapped = page.edges.map(({ node: o }) => ({
+        id:                 o.id.replace("gid://shopify/Order/", ""),
+        name:               o.name,
+        created_at:         o.createdAt,
+        cancelled_at:       o.cancelledAt || null,
+        customer_id:        o.customer?.legacyResourceId || null,
+        financial_status:   (o.displayFinancialStatus || "").toLowerCase().replace(/_/g, " "),
+        fulfillment_status: (o.displayFulfillmentStatus || "unfulfilled").toLowerCase().replace(/_/g, " "),
+        total_price:        o.totalPriceSet?.shopMoney?.amount || "0",
+        line_items:         o.lineItems.edges.map(({ node: li }) => ({
+          id:            li.id.replace("gid://shopify/LineItem/", ""),
+          title:         li.title,
+          variant_title: li.variantTitle,
+          quantity:      li.quantity,
+          price:         li.originalUnitPriceSet?.shopMoney?.amount || "0",
+        })),
+      }));
+
+      allOrders.push(...mapped);
+      hasNextPage = page.pageInfo.hasNextPage;
+      cursor = page.pageInfo.endCursor;
+
+      // Rate limit protection between pages
+      if (hasNextPage) await new Promise(r => setTimeout(r, 300));
+    }
+
+    console.log(`Orders: fetched ${allOrders.length} orders from last 90 days`);
+    res.json(allOrders);
   } catch (e) {
     console.error("Orders error:", e.message);
     res.status(500).json({ error: e.message });

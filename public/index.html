@@ -777,11 +777,15 @@ function statusBadge(s) {
 // ── Orders ──
 async function loadOrders() {
   try {
+    document.getElementById('store-name').innerHTML = '<span class="spinner" style="width:12px;height:12px;border-width:2px;margin-right:6px"></span> Fetching 90-day orders...';
     allOrders = await api('/api/orders');
-    document.getElementById('store-name').textContent = allOrders.length + ' orders loaded';
+    document.getElementById('store-name').textContent = `📦 ${allOrders.length} orders (90 days)`;
     renderOrdersTable();
     renderDashOrders();
-  } catch(e) { toast('Orders error: ' + e.message, 'error'); }
+  } catch(e) {
+    toast('Orders error: ' + e.message, 'error');
+    document.getElementById('store-name').textContent = '❌ Error';
+  }
 }
 
 function renderOrdersTable() {
