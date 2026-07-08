@@ -297,7 +297,95 @@ app.post("/api/cleanup-duplicate-tags", async (req, res) => {
   }
 });
 
-// ── Re-evaluate: recalculate risk for ALL already-tagged orders using latest rules ──
+// ── Force remove Smart Returns tags from specific orders ──
+app.post("/api/force-remove-tags", async (req, res) => {
+  try {
+    const { orderNames } = req.body; // e.g. ["fr-284328", "fr-284329", "fr-284330"]
+
+    // If specific orders provided, remove tags from those only
+    // If none provided, re-check ALL tagged orders and remove where now SAFE
+    const data = await shopifyRequest("GET",
+      `orders.json?status=any&limit=250&fields=id,name,tags,customer_id,created_at`
+    );
+    const allOrders = data.orders || [];
+
+    const since = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+    const cutoff48h = new Date(Date.now() - 48 * 60 * 60 * 1000);
+    const fixed = [];
+
+    for (const order of allOrders) {
+      const tags = (order.tags || "").split(",").map(t => t.trim()).filter(Boolean);
+      const hasRiskTag = tags.some(t => t === "Smart Returns - High Risk Order" || t === "Smart Returns - Medium Risk Order");
+      if (!hasRiskTag) continue;
+
+      // If orderNames provided, only process those specific orders
+      if (orderNames?.length && !orderNames.includes(order.name)) continue;
+
+      if (!order.customer_id) continue;
+      await new Promise(r => setTimeout(r, 200));
+
+      try {
+        const histData = await shopifyRequest("GET",
+          `orders.json?customer_id=${order.customer_id}&status=any&created_at_min=${since}&limit=250&fields=id,name,financial_status,cancelled_at,created_at`
+        );
+        const history = histData.orders || [];
+
+        // Apply 48h rule
+        const matureHistory = history.filter(o =>
+          String(o.id) !== String(order.id) &&
+          new Date(o.created_at) < cutoff48h
+        );
+
+        const badOrders = matureHistory.filter(o =>
+          o.financial_status === "voided" || o.financial_status === "refunded" || !!o.cancelled_at
+        );
+        const deliveredOrders = matureHistory.filter(o =>
+          o.financial_status === "paid" && !o.cancelled_at
+        );
+
+        const { riskLevel } = classifyRisk(matureHistory.length, badOrders.length, deliveredOrders.length);
+
+        // Determine correct tag
+        const correctTag = riskLevel === "high-risk" ? "Smart Returns - High Risk Order"
+          : riskLevel === "medium-risk" ? "Smart Returns - Medium Risk Order"
+          : null;
+
+        // Get current risk tag on this order
+        const currentRiskTag = tags.find(t =>
+          t === "Smart Returns - High Risk Order" || t === "Smart Returns - Medium Risk Order"
+        );
+
+        if (currentRiskTag !== correctTag) {
+          const updatedTags = tags.filter(t =>
+            t !== "Smart Returns - High Risk Order" && t !== "Smart Returns - Medium Risk Order"
+          );
+          if (correctTag) updatedTags.push(correctTag);
+
+          await shopifyRequest("PUT", `orders/${order.id}.json`, {
+            order: { id: order.id, tags: updatedTags.join(", ") },
+          });
+
+          fixed.push({
+            order: order.name,
+            was: currentRiskTag || "none",
+            now: correctTag || "✅ Removed (Safe)",
+            mature: matureHistory.length,
+            bad: badOrders.length,
+            delivered: deliveredOrders.length,
+          });
+          console.log(`✅ Fixed ${order.name}: ${currentRiskTag} → ${correctTag || "removed"}`);
+        }
+      } catch(e) {
+        console.warn(`Could not fix ${order.name}:`, e.message);
+      }
+    }
+
+    res.json({ scanned: allOrders.length, fixed: fixed.length, details: fixed });
+  } catch (e) {
+    console.error("Force remove error:", e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
 app.post("/api/reevaluate-tags", async (req, res) => {
   try {
     // Fetch all orders that already have a Smart Returns tag
@@ -324,9 +412,9 @@ app.post("/api/reevaluate-tags", async (req, res) => {
       await new Promise(r => setTimeout(r, 200)); // rate limit protection
 
       try {
-        // Fetch full customer history
+        // Fetch full customer history — include created_at for 48h rule
         const histData = await shopifyRequest("GET",
-          `orders.json?customer_id=${order.customer_id}&status=any&created_at_min=${since}&limit=250&fields=id,name,financial_status,cancelled_at`
+          `orders.json?customer_id=${order.customer_id}&status=any&created_at_min=${since}&limit=250&fields=id,name,financial_status,cancelled_at,created_at,fulfilled_at`
         );
         const history = histData.orders || [];
         const cutoff48h = new Date(Date.now() - 48 * 60 * 60 * 1000);
@@ -343,6 +431,8 @@ app.post("/api/reevaluate-tags", async (req, res) => {
         const deliveredOrders = matureHistory.filter(o =>
           o.financial_status === "paid" && !o.cancelled_at
         );
+
+        console.log(`Re-eval ${order.name}: mature=${matureHistory.length}, bad=${badOrders.length}, delivered=${deliveredOrders.length}`);
 
         const { riskLevel, deliveryRate } = classifyRisk(matureHistory.length, badOrders.length, deliveredOrders.length);
 

@@ -649,6 +649,10 @@ select.form-control option{background:var(--surface2);}
       <button class="btn btn-primary" id="reeval-btn" onclick="runReeval()">
         <span class="material-symbols-rounded">published_with_changes</span> Re-evaluate All Tagged Orders
       </button>
+      &nbsp;
+      <button class="btn btn-outline" id="forcefix-btn" onclick="runForceFix()">
+        <span class="material-symbols-rounded">delete_sweep</span> Force Fix Wrong Tags
+      </button>
       <div id="reeval-result" style="margin-top:14px"></div>
     </div>
   </div>
@@ -1140,6 +1144,49 @@ function saveRules() {
     tagMedium: document.getElementById('rule-tag-medium').value,
   }));
   toast('Rules saved successfully!', 'success');
+}
+
+async function runForceFix() {
+  const btn = document.getElementById('forcefix-btn');
+  const result = document.getElementById('reeval-result');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="material-symbols-rounded">hourglass_empty</span> Fixing...';
+  result.innerHTML = '<div style="color:var(--sub);font-size:13px;font-weight:600">⏳ Scanning all tagged orders and applying 48-hour rule + delivery rate rules...</div>';
+  try {
+    const d = await api('/api/force-remove-tags', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({})
+    });
+    if (d.fixed === 0) {
+      result.innerHTML = `<div class="alert success"><div class="alert-icon">✅</div><div><strong>All tags are correct!</strong><span>Scanned ${d.scanned} orders — nothing to fix.</span></div></div>`;
+    } else {
+      const rows = d.details.map(o =>
+        `<tr>
+          <td><strong>${o.order}</strong></td>
+          <td style="color:var(--red);font-size:12px">${o.was}</td>
+          <td style="color:var(--green);font-size:12px">${o.now}</td>
+          <td style="color:var(--sub);font-size:12px">${o.bad} bad / ${o.mature} mature / ${o.delivered} delivered</td>
+        </tr>`
+      ).join('');
+      result.innerHTML = `
+        <div class="alert success" style="margin-bottom:12px">
+          <div class="alert-icon">✅</div>
+          <div><strong>Fixed ${d.fixed} order(s)</strong></div>
+        </div>
+        <table class="data-table">
+          <thead><tr><th>Order</th><th>Was</th><th>Now</th><th>History</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>`;
+    }
+    toast(`Force fix complete — ${d.fixed} order(s) corrected`, 'success');
+  } catch(e) {
+    result.innerHTML = `<div style="color:var(--red);font-size:13px">❌ Error: ${e.message}</div>`;
+    toast('Force fix failed: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<span class="material-symbols-rounded">delete_sweep</span> Force Fix Wrong Tags';
+  }
 }
 
 async function runReeval() {
