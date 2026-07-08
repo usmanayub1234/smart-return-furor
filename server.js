@@ -176,25 +176,33 @@ app.post("/webhooks/orders/create", express.raw({ type: "*/*" }), async (req, re
   }
 
   const totalOrders = history.length;
+  const cutoff48h = new Date(Date.now() - 48 * 60 * 60 * 1000); // 48 hours ago
 
-  // Bad orders = voided, refunded, OR cancelled, excluding current new order
-  const badOrders = history.filter(o =>
+  // Only count orders older than 48 hours — new orders haven't had time to deliver yet
+  const matureOrders = history.filter(o =>
     String(o.id) !== String(orderId) &&
-    (o.financial_status === "voided" || o.financial_status === "refunded" || !!o.cancelled_at)
+    new Date(o.created_at) < cutoff48h
   );
 
-  // Delivered orders = fulfilled (not voided/cancelled/refunded), excluding current order
-  const deliveredOrders = history.filter(o =>
-    String(o.id) !== String(orderId) &&
-    o.financial_status === "paid" &&
-    !o.cancelled_at
+  // Bad orders = voided, refunded, OR cancelled (only from mature orders)
+  const badOrders = matureOrders.filter(o =>
+    o.financial_status === "voided" || o.financial_status === "refunded" || !!o.cancelled_at
+  );
+
+  // Delivered orders = paid & fulfilled (only from mature orders)
+  const deliveredOrders = matureOrders.filter(o =>
+    o.financial_status === "paid" && !o.cancelled_at
   );
 
   const badCount = badOrders.length;
   const deliveredCount = deliveredOrders.length;
-  const { riskLevel, deliveryRate } = classifyRisk(totalOrders, badCount, deliveredCount);
+  const matureTotal = matureOrders.length;
 
-  console.log(`📊 [${orderName}] ${badCount} bad, ${deliveredCount}/${totalOrders} delivered (${deliveryRate}% delivery rate) → ${riskLevel || "safe"}`);
+  console.log(`📊 [${orderName}] Mature orders (48h+): ${matureTotal} | Bad: ${badCount} | Delivered: ${deliveredCount} | New (skipped): ${totalOrders - matureTotal - 1}`);
+
+  const { riskLevel, deliveryRate } = classifyRisk(matureTotal, badCount, deliveredCount);
+
+  console.log(`📊 [${orderName}] Delivery rate: ${deliveryRate}% → ${riskLevel || "safe"}`);
 
   if (!riskLevel) {
     console.log(`✅ [${orderName}] Customer safe — no tag needed`);
@@ -321,18 +329,22 @@ app.post("/api/reevaluate-tags", async (req, res) => {
           `orders.json?customer_id=${order.customer_id}&status=any&created_at_min=${since}&limit=250&fields=id,name,financial_status,cancelled_at`
         );
         const history = histData.orders || [];
-        const totalOrders = history.length;
+        const cutoff48h = new Date(Date.now() - 48 * 60 * 60 * 1000);
 
-        const badOrders = history.filter(o =>
+        // Only evaluate mature orders (48h+)
+        const matureHistory = history.filter(o =>
           String(o.id) !== String(order.id) &&
-          (o.financial_status === "voided" || o.financial_status === "refunded" || !!o.cancelled_at)
+          new Date(o.created_at) < cutoff48h
         );
-        const deliveredOrders = history.filter(o =>
-          String(o.id) !== String(order.id) &&
+
+        const badOrders = matureHistory.filter(o =>
+          o.financial_status === "voided" || o.financial_status === "refunded" || !!o.cancelled_at
+        );
+        const deliveredOrders = matureHistory.filter(o =>
           o.financial_status === "paid" && !o.cancelled_at
         );
 
-        const { riskLevel, deliveryRate } = classifyRisk(totalOrders, badOrders.length, deliveredOrders.length);
+        const { riskLevel, deliveryRate } = classifyRisk(matureHistory.length, badOrders.length, deliveredOrders.length);
 
         const currentTags = (order.tags || "").split(",").map(t => t.trim()).filter(Boolean);
         const hasHigh = currentTags.includes("Smart Returns - High Risk Order");
@@ -488,11 +500,17 @@ app.post("/api/scan-high-risk", async (req, res) => {
     if (data.errors) throw new Error(data.errors[0].message);
 
     const orders = data.data.orders.edges.map(e => e.node);
+    const cutoff48h = new Date(Date.now() - 48 * 60 * 60 * 1000); // 48 hours ago
 
-    // Group by customer — count voided + refunded + cancelled + delivered orders per customer
+    // Group by customer — only count MATURE orders (48h+), skip new orders
     const customerMap = {};
     for (const order of orders) {
       if (!order.customer) continue;
+
+      // Skip orders less than 48 hours old — they haven't had time to deliver yet
+      const orderAge = new Date(order.createdAt);
+      const isMature = orderAge < cutoff48h;
+
       const cid = order.customer.legacyResourceId;
       if (!customerMap[cid]) {
         customerMap[cid] = {
@@ -503,9 +521,17 @@ app.post("/api/scan-high-risk", async (req, res) => {
           voidedCount: 0,
           refundedCount: 0,
           deliveredCount: 0,
+          newOrderCount: 0,
           badOrders: [],
         };
       }
+
+      if (!isMature) {
+        // Count new orders separately but don't include in risk calculation
+        customerMap[cid].newOrderCount++;
+        continue;
+      }
+
       customerMap[cid].totalOrders++;
       const status = (order.displayFinancialStatus || "").toLowerCase();
       const isCancelled = !!order.cancelledAt;
@@ -517,7 +543,6 @@ app.post("/api/scan-high-risk", async (req, res) => {
         customerMap[cid].refundedCount++;
         customerMap[cid].badOrders.push(order.name);
       } else if (status === "paid") {
-        // Count paid (successfully delivered/fulfilled) orders
         customerMap[cid].deliveredCount++;
       }
     }
