@@ -826,10 +826,14 @@ app.get("/api/top-customers", async (req, res) => {
     for (const c of top3) {
       try {
         const cData = await shopifyRequest("GET", `customers/${c.customerId}.json?fields=id,first_name,last_name,email`);
-        const cu = cData.customer || {};
+        const cu = cData?.customer;
+        if (!cu) {
+          result.push({ customerId: c.customerId, name: `Customer ${c.customerId}`, email: "", totalSpent: c.totalSpent.toFixed(2), orderCount: c.orderCount });
+          continue;
+        }
         result.push({ customerId: c.customerId, name: `${cu.first_name||""} ${cu.last_name||""}`.trim()||"Unknown", email: cu.email||"", totalSpent: c.totalSpent.toFixed(2), orderCount: c.orderCount });
       } catch(_) {
-        result.push({ customerId: c.customerId, name: `Customer ${c.customerId}`, totalSpent: c.totalSpent.toFixed(2), orderCount: c.orderCount });
+        result.push({ customerId: c.customerId, name: `Customer ${c.customerId}`, email: "", totalSpent: c.totalSpent.toFixed(2), orderCount: c.orderCount });
       }
     }
     res.json(result);
@@ -903,15 +907,19 @@ app.get("/api/loyal-customers", async (req, res) => {
       .sort((a, b) => b.totalSpent - a.totalSpent)
       .slice(0, 50);
 
-    // Fetch customer names
+    // Fetch customer names safely
     const result = [];
     for (const c of topLoyal) {
-      await new Promise(r => setTimeout(r, 80)); // rate limit
+      await new Promise(r => setTimeout(r, 80));
       try {
         const cData = await shopifyRequest("GET",
           `customers/${c.customerId}.json?fields=id,first_name,last_name,email,phone,total_spent,orders_count`
         );
-        const cu = cData.customer || {};
+        const cu = cData?.customer;
+        if (!cu) {
+          result.push({ customerId: c.customerId, name: `Customer ${c.customerId}`, email: "", phone: "", totalSpent: c.totalSpent.toFixed(2), orderCount: c.orderCount, lifetimeSpent: "0", lifetimeOrders: 0 });
+          continue;
+        }
         result.push({
           customerId: c.customerId,
           name: `${cu.first_name || ""} ${cu.last_name || ""}`.trim() || "Unknown",
@@ -923,7 +931,7 @@ app.get("/api/loyal-customers", async (req, res) => {
           lifetimeOrders: cu.orders_count || 0,
         });
       } catch (_) {
-        result.push({ customerId: c.customerId, name: `Customer ${c.customerId}`, totalSpent: c.totalSpent.toFixed(2), orderCount: c.orderCount });
+        result.push({ customerId: c.customerId, name: `Customer ${c.customerId}`, email: "", phone: "", totalSpent: c.totalSpent.toFixed(2), orderCount: c.orderCount, lifetimeSpent: "0", lifetimeOrders: 0 });
       }
     }
 
