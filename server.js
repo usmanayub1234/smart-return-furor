@@ -839,6 +839,101 @@ app.get("/api/top-customers", async (req, res) => {
   }
 });
 
+// ── Loyal Customers — 100% safe orders, koi void/cancel nahi ──
+app.get("/api/loyal-customers", async (req, res) => {
+  try {
+    const since = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+
+    // Fetch all paid orders from last 90 days
+    const data = await shopifyGQL(`{
+      orders(first: 250, query: "created_at:>='${since}' financial_status:paid") {
+        edges { node {
+          id name createdAt
+          totalPriceSet { shopMoney { amount } }
+          customer { legacyResourceId }
+          displayFinancialStatus
+          cancelledAt
+        }}
+      }
+    }`);
+
+    if (data.errors) throw new Error(data.errors[0].message);
+
+    const paidOrders = data.data.orders.edges.map(e => e.node);
+
+    // Also fetch voided/cancelled orders to exclude those customers
+    const badData = await shopifyGQL(`{
+      orders(first: 250, query: "created_at:>='${since}'") {
+        edges { node {
+          id
+          displayFinancialStatus
+          cancelledAt
+          customer { legacyResourceId }
+        }}
+      }
+    }`);
+
+    if (badData.errors) throw new Error(badData.errors[0].message);
+
+    // Find all customer IDs who have ANY bad order
+    const badCustomerIds = new Set();
+    for (const { node: o } of badData.data.orders.edges) {
+      const status = (o.displayFinancialStatus || "").toLowerCase();
+      if (status === "voided" || status === "refunded" || !!o.cancelledAt) {
+        if (o.customer?.legacyResourceId) {
+          badCustomerIds.add(o.customer.legacyResourceId);
+        }
+      }
+    }
+
+    // Group paid orders by customer — exclude anyone with bad history
+    const loyalMap = {};
+    for (const { node: o } of paidOrders) {
+      const cid = o.customer?.legacyResourceId;
+      if (!cid || badCustomerIds.has(cid)) continue; // skip risky customers
+
+      const amount = parseFloat(o.totalPriceSet?.shopMoney?.amount || 0);
+      if (!loyalMap[cid]) loyalMap[cid] = { customerId: cid, totalSpent: 0, orderCount: 0 };
+      loyalMap[cid].totalSpent += amount;
+      loyalMap[cid].orderCount++;
+    }
+
+    // Sort by total spent, take top 50
+    const topLoyal = Object.values(loyalMap)
+      .sort((a, b) => b.totalSpent - a.totalSpent)
+      .slice(0, 50);
+
+    // Fetch customer names
+    const result = [];
+    for (const c of topLoyal) {
+      await new Promise(r => setTimeout(r, 80)); // rate limit
+      try {
+        const cData = await shopifyRequest("GET",
+          `customers/${c.customerId}.json?fields=id,first_name,last_name,email,phone,total_spent,orders_count`
+        );
+        const cu = cData.customer || {};
+        result.push({
+          customerId: c.customerId,
+          name: `${cu.first_name || ""} ${cu.last_name || ""}`.trim() || "Unknown",
+          email: cu.email || "",
+          phone: cu.phone || "",
+          totalSpent: c.totalSpent.toFixed(2),
+          orderCount: c.orderCount,
+          lifetimeSpent: cu.total_spent || "0",
+          lifetimeOrders: cu.orders_count || 0,
+        });
+      } catch (_) {
+        result.push({ customerId: c.customerId, name: `Customer ${c.customerId}`, totalSpent: c.totalSpent.toFixed(2), orderCount: c.orderCount });
+      }
+    }
+
+    res.json(result);
+  } catch (e) {
+    console.error("Loyal customers error:", e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ── Analytics ──
 app.get("/api/analytics", async (req, res) => {
   try {

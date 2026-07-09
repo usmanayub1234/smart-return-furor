@@ -533,6 +533,30 @@ select.form-control option{background:var(--surface2);}
     </div>
   </div>
 
+  <!-- LOYAL CUSTOMERS -->
+  <div class="card" style="border-color:rgba(0,212,138,.3)">
+    <div class="card-head" style="background:linear-gradient(135deg,rgba(0,212,138,.1),rgba(79,124,255,.1))">
+      <div class="card-title" style="font-size:16px">🎁 Loyal Customers — Gift List (Last 90 Days)</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span style="font-size:12px;color:var(--sub)" id="loyal-count"></span>
+        <button class="btn btn-outline btn-sm" onclick="loadLoyalCustomers()">
+          <span class="material-symbols-rounded">refresh</span> Refresh
+        </button>
+      </div>
+    </div>
+    <div class="card-body" style="padding:12px 16px">
+      <div style="font-size:12px;color:var(--sub);margin-bottom:14px">
+        ✅ Customers jinke <strong>saare orders safe/paid</strong> hain — koi void ya cancel nahi. Perfect for gifts & loyalty rewards!
+      </div>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="data-table">
+        <thead><tr><th>#</th><th>Customer</th><th>Email</th><th>Phone</th><th>Orders (90d)</th><th>Spent (90d)</th><th>Lifetime Spent</th><th>Action</th></tr></thead>
+        <tbody id="loyal-tbody"><tr><td colspan="8"><div class="empty" style="padding:30px 0"><span class="spinner"></span></div></td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
   <!-- RISK CUSTOMERS -->
   <div class="card">
     <div class="card-head">
@@ -742,7 +766,7 @@ function navTo(page) {
   document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.page === page));
   document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === `page-${page}`));
   if (page === 'analytics') loadAnalytics();
-  if (page === 'customers') { loadRiskyCustomers(); loadTopCustomers(); }
+  if (page === 'customers') { loadRiskyCustomers(); loadTopCustomers(); loadLoyalCustomers(); }
   if (page === 'flagged') {
     if (scanResults.length) {
       renderFlagged(); // re-render existing results
@@ -1090,6 +1114,46 @@ function renderFlagged() {
     </td>
   </tr>`;
   }).join('');
+}
+
+// ── Loyal Customers — Gift List ──
+async function loadLoyalCustomers() {
+  const tbody = document.getElementById('loyal-tbody');
+  const countEl = document.getElementById('loyal-count');
+  tbody.innerHTML = `<tr><td colspan="8"><div class="empty" style="padding:30px 0"><span class="spinner"></span><p style="margin-top:10px;color:var(--sub);font-size:13px">Analyzing 90-day orders...</p></div></td></tr>`;
+  try {
+    const customers = await api('/api/loyal-customers');
+    countEl.textContent = customers.length + ' loyal customers found';
+
+    if (!customers.length) {
+      tbody.innerHTML = `<tr><td colspan="8"><div class="empty"><span class="empty-icon">🎁</span><h3>Koi loyal customer nahi mila</h3><p>90 din mein koi 100% safe customer nahi</p></div></td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = customers.map((c, i) => {
+      const rank = i === 0 ? '💎' : i === 1 ? '🥇' : i === 2 ? '🥈' : `${i+1}.`;
+      return `<tr>
+        <td><strong style="font-size:16px">${rank}</strong></td>
+        <td>
+          <a href="https://${window._shop||''}/admin/customers/${c.customerId}" target="_blank"
+             style="color:var(--green);font-weight:700;text-decoration:none"
+             onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">
+            ${c.name}
+          </a>
+        </td>
+        <td style="color:var(--sub);font-size:12px">${c.email||'—'}</td>
+        <td style="color:var(--sub);font-size:12px">${c.phone||'—'}</td>
+        <td><strong style="color:var(--green)">${c.orderCount}</strong></td>
+        <td><strong style="color:var(--green)">Rs ${parseFloat(c.totalSpent).toLocaleString('en-PK',{maximumFractionDigits:0})}</strong></td>
+        <td style="color:var(--sub)">Rs ${parseFloat(c.lifetimeSpent||0).toLocaleString('en-PK',{maximumFractionDigits:0})}</td>
+        <td>
+          <a href="mailto:${c.email}" class="btn btn-outline btn-sm" style="text-decoration:none;font-size:11px">
+            📧 Gift
+          </a>
+        </td>
+      </tr>`;
+    }).join('');
+  } catch(e) { toast('Loyal customers error: ' + e.message, 'error'); }
 }
 
 // ── Risky Customers — sirf risky dikhao, safe nahi ──
