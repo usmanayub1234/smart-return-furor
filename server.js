@@ -233,15 +233,25 @@ app.post("/webhooks/orders/create", express.raw({ type: "*/*" }), async (req, re
     // continue to step 3 anyway — order tag is still useful even if customer tag failed
   }
 
-  // ── Step 3: tag the order itself ──
+  // ── Step 3: tag the order itself — ONLY if payment is pending ──
   try {
+    // Get current order details to check payment status
+    const orderData = await shopifyRequest("GET", `orders/${orderId}.json?fields=id,tags,financial_status`);
+    const currentOrder = orderData.order;
+    const paymentStatus = (currentOrder?.financial_status || "").toLowerCase();
+
+    // Skip tagging if order is already paid — paise aa gaye, risk nahi
+    if (paymentStatus === "paid") {
+      console.log(`✅ [${orderName}] Step 3 SKIPPED — order already paid, no risk tag needed`);
+      return;
+    }
+
     const orderTag = riskLevel === "high-risk"
       ? "Smart Returns - High Risk Order"
       : "Smart Returns - Medium Risk Order";
 
-    const orderData = await shopifyRequest("GET", `orders/${orderId}.json?fields=id,tags`);
-    const existingOrderTags = orderData.order?.tags
-      ? orderData.order.tags.split(",").map(t => t.trim()).filter(Boolean)
+    const existingOrderTags = currentOrder?.tags
+      ? currentOrder.tags.split(",").map(t => t.trim()).filter(Boolean)
       : [];
 
     const cleanedOrderTags = applyCleanRiskTag(existingOrderTags, orderTag);
@@ -250,7 +260,7 @@ app.post("/webhooks/orders/create", express.raw({ type: "*/*" }), async (req, re
         order: { id: orderId, tags: cleanedOrderTags.join(", ") },
       });
     }
-    console.log(`🚨 [${orderName}] Step 3 OK — tagged as "${orderTag}"`);
+    console.log(`🚨 [${orderName}] Step 3 OK — tagged as "${orderTag}" (status: ${paymentStatus})`);
   } catch (e) {
     console.error(`✗ [${orderName}] Step 3 FAILED (tag order ${orderId}):`, e.message);
   }
@@ -305,7 +315,7 @@ app.post("/api/force-remove-tags", async (req, res) => {
     // If specific orders provided, remove tags from those only
     // If none provided, re-check ALL tagged orders and remove where now SAFE
     const data = await shopifyRequest("GET",
-      `orders.json?status=any&limit=250&fields=id,name,tags,customer_id,created_at`
+      `orders.json?status=any&limit=250&fields=id,name,tags,customer_id,created_at,financial_status`
     );
     const allOrders = data.orders || [];
 
@@ -325,6 +335,26 @@ app.post("/api/force-remove-tags", async (req, res) => {
       await new Promise(r => setTimeout(r, 200));
 
       try {
+        // If this order is already PAID — remove risk tag immediately
+        // Paid order = paise aa gaye, risk nahi
+        const orderPayStatus = (order.financial_status || "").toLowerCase();
+        if (orderPayStatus === "paid") {
+          const updatedTags = tags.filter(t =>
+            t !== "Smart Returns - High Risk Order" && t !== "Smart Returns - Medium Risk Order"
+          );
+          await shopifyRequest("PUT", `orders/${order.id}.json`, {
+            order: { id: order.id, tags: updatedTags.join(", ") },
+          });
+          fixed.push({
+            order: order.name,
+            was: tags.find(t => t.includes("Smart Returns")) || "risk tag",
+            now: "✅ Removed — Order Paid",
+            mature: 0, bad: 0, delivered: 0,
+          });
+          console.log(`✅ Removed tag from ${order.name} — already paid`);
+          continue;
+        }
+
         const histData = await shopifyRequest("GET",
           `orders.json?customer_id=${order.customer_id}&status=any&created_at_min=${since}&limit=250&fields=id,name,financial_status,cancelled_at,created_at`
         );
@@ -673,7 +703,8 @@ app.post("/api/scan-high-risk", async (req, res) => {
           },
         });
 
-        // Also tag all NEW (non-bad) orders from this customer as risky — clean conflicting tag first
+        // Also tag all NEW (non-bad, non-paid) orders from this customer
+        // Paid orders skip karo — paise aa gaye, risk nahi
         const newOrders = orders.filter(o =>
           o.customer?.legacyResourceId === cid &&
           !c.badOrders.includes(o.name)
@@ -681,9 +712,18 @@ app.post("/api/scan-high-risk", async (req, res) => {
         for (const newOrder of newOrders) {
           await new Promise(r => setTimeout(r, 120));
           const orderId = newOrder.id.replace("gid://shopify/Order/", "");
-          const existingOrder = await shopifyRequest("GET", `orders/${orderId}.json?fields=id,tags`);
-          const existingOrderTags = existingOrder.order?.tags
-            ? existingOrder.order.tags.split(",").map(t => t.trim()).filter(Boolean)
+
+          // Check payment status — skip if paid
+          const orderDetail = await shopifyRequest("GET", `orders/${orderId}.json?fields=id,tags,financial_status`);
+          const payStatus = (orderDetail.order?.financial_status || "").toLowerCase();
+
+          if (payStatus === "paid") {
+            console.log(`Scan: Skipping ${newOrder.name} — already paid`);
+            continue; // paid order — skip
+          }
+
+          const existingOrderTags = orderDetail.order?.tags
+            ? orderDetail.order.tags.split(",").map(t => t.trim()).filter(Boolean)
             : [];
           const riskTag = riskLevel === "high-risk" ? "Smart Returns - High Risk Order" : "Smart Returns - Medium Risk Order";
           const cleanedOrderTags = applyCleanRiskTag(existingOrderTags, riskTag);
@@ -735,12 +775,66 @@ app.post("/api/scan-high-risk", async (req, res) => {
 });
 
 // ── Get high-risk customers from Shopify ──
+// ── Risk Customers — sirf risky (high + medium), safe nahi ──
 app.get("/api/high-risk-customers", async (req, res) => {
   try {
-    const data = await shopifyRequest("GET", `customers.json?tag=high-risk&limit=50`);
-    res.json(data.customers || []);
+    const [highData, medData] = await Promise.all([
+      shopifyRequest("GET", `customers.json?tag=high-risk&limit=250&fields=id,first_name,last_name,email,tags,orders_count,total_spent`),
+      shopifyRequest("GET", `customers.json?tag=medium-risk&limit=250&fields=id,first_name,last_name,email,tags,orders_count,total_spent`),
+    ]);
+    const highRisk = (highData.customers || []).map(c => ({ ...c, _riskLevel: "high-risk" }));
+    const medRisk = (medData.customers || []).map(c => ({ ...c, _riskLevel: "medium-risk" }));
+    const map = {};
+    [...medRisk, ...highRisk].forEach(c => { map[c.id] = c; });
+    const all = Object.values(map).sort((a, b) => {
+      if (a._riskLevel === "high-risk" && b._riskLevel !== "high-risk") return -1;
+      if (b._riskLevel === "high-risk" && a._riskLevel !== "high-risk") return 1;
+      return parseFloat(b.total_spent || 0) - parseFloat(a.total_spent || 0);
+    });
+    res.json(all);
   } catch (e) {
-    console.error("High risk customers error:", e.message);
+    console.error("Risk customers error:", e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ── Top Customers — Diamond, Gold, Silver (last 90 days paid orders) ──
+app.get("/api/top-customers", async (req, res) => {
+  try {
+    const since = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+    const data = await shopifyGQL(`{
+      orders(first: 250, query: "created_at:>='${since}' financial_status:paid") {
+        edges { node {
+          id
+          totalPriceSet { shopMoney { amount } }
+          customer { legacyResourceId }
+        }}
+      }
+    }`);
+    if (data.errors) throw new Error(data.errors[0].message);
+    const customerSpend = {};
+    for (const { node: o } of data.data.orders.edges) {
+      const cid = o.customer?.legacyResourceId;
+      if (!cid) continue;
+      const amount = parseFloat(o.totalPriceSet?.shopMoney?.amount || 0);
+      if (!customerSpend[cid]) customerSpend[cid] = { customerId: cid, totalSpent: 0, orderCount: 0 };
+      customerSpend[cid].totalSpent += amount;
+      customerSpend[cid].orderCount++;
+    }
+    const top3 = Object.values(customerSpend).sort((a, b) => b.totalSpent - a.totalSpent).slice(0, 3);
+    const result = [];
+    for (const c of top3) {
+      try {
+        const cData = await shopifyRequest("GET", `customers/${c.customerId}.json?fields=id,first_name,last_name,email`);
+        const cu = cData.customer || {};
+        result.push({ customerId: c.customerId, name: `${cu.first_name||""} ${cu.last_name||""}`.trim()||"Unknown", email: cu.email||"", totalSpent: c.totalSpent.toFixed(2), orderCount: c.orderCount });
+      } catch(_) {
+        result.push({ customerId: c.customerId, name: `Customer ${c.customerId}`, totalSpent: c.totalSpent.toFixed(2), orderCount: c.orderCount });
+      }
+    }
+    res.json(result);
+  } catch (e) {
+    console.error("Top customers error:", e.message);
     res.status(500).json({ error: e.message });
   }
 });
