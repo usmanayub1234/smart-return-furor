@@ -161,15 +161,16 @@ app.post("/webhooks/orders/create", express.raw({ type: "*/*" }), async (req, re
 
   console.log(`🔔 [${orderName}] Webhook fired for customer ${customerId}`);
 
-  // ── Step 1: fetch order history ──
+  // ── Step 1: fetch order history — last 180 days ──
+  // 180 days taake purane voided orders bhi count hon
   let history;
   try {
-    const since = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+    const since = new Date(Date.now() - 180 * 24 * 60 * 60 * 1000).toISOString();
     const historyData = await shopifyRequest("GET",
       `orders.json?customer_id=${customerId}&status=any&created_at_min=${since}&limit=250&fields=id,name,financial_status,fulfillment_status,cancelled_at,created_at`
     );
     history = historyData.orders || [];
-    console.log(`✓ [${orderName}] Step 1 OK — fetched ${history.length} orders: ${history.map(o=>`${o.name}:${o.financial_status}/${o.fulfillment_status||'?'}${o.cancelled_at?'(cancelled)':''}`).join(', ')}`);
+    console.log(`✓ [${orderName}] Step 1 OK — fetched ${history.length} orders (180 days): ${history.map(o=>`${o.name}:${o.financial_status}/${o.fulfillment_status||'?'}${o.cancelled_at?'(cancelled)':''}`).join(', ')}`);
   } catch (e) {
     console.error(`✗ [${orderName}] Step 1 FAILED (fetch history):`, e.message);
     return;
@@ -327,7 +328,7 @@ app.post("/api/force-remove-tags", async (req, res) => {
     );
     const allOrders = data.orders || [];
 
-    const since = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+    const since = new Date(Date.now() - 180 * 24 * 60 * 60 * 1000).toISOString(); // 180 days for full history
     const cutoff24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
     const fixed = [];
 
@@ -442,7 +443,7 @@ app.post("/api/reevaluate-tags", async (req, res) => {
       Object.fromEntries(tagged.map(o => [o.id, o]))
     );
 
-    const since = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+    const since = new Date(Date.now() - 180 * 24 * 60 * 60 * 1000).toISOString(); // 180 days for full history
     const results = { scanned: unique.length, fixed: 0, fixedOrders: [] };
 
     for (const order of unique) {
