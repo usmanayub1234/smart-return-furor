@@ -868,13 +868,16 @@ app.get("/api/loyal-customers", async (req, res) => {
   try {
     const since = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
 
-    // Fetch all paid orders from last 90 days
+    // Fetch paid orders with customer name directly from GraphQL
     const data = await shopifyGQL(`{
       orders(first: 250, query: "created_at:>='${since}' financial_status:paid") {
         edges { node {
           id name createdAt
           totalPriceSet { shopMoney { amount } }
-          customer { legacyResourceId }
+          customer {
+            legacyResourceId
+            displayName
+          }
           displayFinancialStatus
           cancelledAt
         }}
@@ -885,7 +888,7 @@ app.get("/api/loyal-customers", async (req, res) => {
 
     const paidOrders = data.data.orders.edges.map(e => e.node);
 
-    // Also fetch voided/cancelled orders to exclude those customers
+    // Fetch voided/cancelled orders to exclude those customers
     const badData = await shopifyGQL(`{
       orders(first: 250, query: "created_at:>='${since}'") {
         edges { node {
@@ -914,50 +917,35 @@ app.get("/api/loyal-customers", async (req, res) => {
     const loyalMap = {};
     for (const { node: o } of paidOrders) {
       const cid = o.customer?.legacyResourceId;
-      if (!cid || badCustomerIds.has(cid)) continue; // skip risky customers
+      if (!cid || badCustomerIds.has(cid)) continue;
 
       const amount = parseFloat(o.totalPriceSet?.shopMoney?.amount || 0);
-      if (!loyalMap[cid]) loyalMap[cid] = { customerId: cid, totalSpent: 0, orderCount: 0 };
+      if (!loyalMap[cid]) {
+        loyalMap[cid] = {
+          customerId: cid,
+          name: o.customer?.displayName || `Customer ${cid}`,
+          totalSpent: 0,
+          orderCount: 0,
+        };
+      }
       loyalMap[cid].totalSpent += amount;
       loyalMap[cid].orderCount++;
     }
 
-    // Sort by total spent, take top 50
-    const topLoyal = Object.values(loyalMap)
+    // Sort by total spent, take top 20
+    const result = Object.values(loyalMap)
       .sort((a, b) => b.totalSpent - a.totalSpent)
-      .slice(0, 20); // 20 tak limit - zyada calls se rate limit
-
-    // Fetch customer names safely
-    const result = [];
-    for (const c of topLoyal) {
-      await new Promise(r => setTimeout(r, 150)); // rate limit protection
-      try {
-        const cData = await shopifyRequest("GET",
-          `customers/${c.customerId}.json?fields=id,first_name,last_name,email,phone,total_spent,orders_count`
-        );
-        const cu = cData?.customer || null;
-        result.push({
-          customerId: c.customerId,
-          name: cu ? `${cu.first_name || ""} ${cu.last_name || ""}`.trim() || "Unknown" : `Customer ${c.customerId}`,
-          email: cu?.email || "",
-          phone: cu?.phone || "",
-          totalSpent: c.totalSpent.toFixed(2),
-          orderCount: c.orderCount,
-          lifetimeSpent: cu?.total_spent || "0",
-          lifetimeOrders: cu?.orders_count || 0,
-        });
-      } catch (_) {
-        // Rate limit ya error — add without name
-        result.push({
-          customerId: c.customerId,
-          name: `Customer ${c.customerId}`,
-          email: "", phone: "",
-          totalSpent: c.totalSpent.toFixed(2),
-          orderCount: c.orderCount,
-          lifetimeSpent: "0", lifetimeOrders: 0,
-        });
-      }
-    }
+      .slice(0, 20)
+      .map(c => ({
+        customerId: c.customerId,
+        name: c.name,
+        email: "",
+        phone: "",
+        totalSpent: c.totalSpent.toFixed(2),
+        orderCount: c.orderCount,
+        lifetimeSpent: "0",
+        lifetimeOrders: 0,
+      }));
 
     res.json(result);
   } catch (e) {
