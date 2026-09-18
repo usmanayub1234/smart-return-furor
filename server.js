@@ -828,6 +828,7 @@ app.get("/api/top-customers", async (req, res) => {
           id
           totalPriceSet { shopMoney { amount } }
           customer { legacyResourceId }
+          billingAddress { name }
         }}
       }
     }`);
@@ -838,7 +839,12 @@ app.get("/api/top-customers", async (req, res) => {
       if (!cid) continue;
       const amount = parseFloat(o.totalPriceSet?.shopMoney?.amount || 0);
       if (!customerSpend[cid]) {
-        customerSpend[cid] = { customerId: cid, totalSpent: 0, orderCount: 0 };
+        customerSpend[cid] = {
+          customerId: cid,
+          name: o.billingAddress?.name || `Customer ${cid}`,
+          totalSpent: 0,
+          orderCount: 0
+        };
       }
       customerSpend[cid].totalSpent += amount;
       customerSpend[cid].orderCount++;
@@ -846,9 +852,9 @@ app.get("/api/top-customers", async (req, res) => {
     const result = Object.values(customerSpend)
       .sort((a, b) => b.totalSpent - a.totalSpent)
       .slice(0, 3)
-      .map((c, i) => ({
+      .map(c => ({
         customerId: c.customerId,
-        name: `Top Customer #${i + 1}`,
+        name: c.name,
         email: "",
         totalSpent: c.totalSpent.toFixed(2),
         orderCount: c.orderCount
@@ -865,13 +871,13 @@ app.get("/api/loyal-customers", async (req, res) => {
   try {
     const since = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
 
-    // Fetch paid orders — sirf amount aur customer ID, koi PII nahi
     const data = await shopifyGQL(`{
       orders(first: 250, query: "created_at:>='${since}' financial_status:paid") {
         edges { node {
           id
           totalPriceSet { shopMoney { amount } }
           customer { legacyResourceId }
+          billingAddress { name }
           cancelledAt
         }}
       }
@@ -880,7 +886,6 @@ app.get("/api/loyal-customers", async (req, res) => {
     if (data.errors) throw new Error(data.errors[0].message);
     const paidOrders = data.data.orders.edges.map(e => e.node);
 
-    // Fetch bad orders to exclude those customers
     const badData = await shopifyGQL(`{
       orders(first: 250, query: "created_at:>='${since}'") {
         edges { node {
@@ -902,24 +907,29 @@ app.get("/api/loyal-customers", async (req, res) => {
       }
     }
 
-    // Group by customer
     const loyalMap = {};
     for (const { node: o } of paidOrders) {
       const cid = o.customer?.legacyResourceId;
       if (!cid || badCustomerIds.has(cid)) continue;
       const amount = parseFloat(o.totalPriceSet?.shopMoney?.amount || 0);
-      if (!loyalMap[cid]) loyalMap[cid] = { customerId: cid, totalSpent: 0, orderCount: 0 };
+      if (!loyalMap[cid]) {
+        loyalMap[cid] = {
+          customerId: cid,
+          name: o.billingAddress?.name || `Customer ${cid}`,
+          totalSpent: 0,
+          orderCount: 0,
+        };
+      }
       loyalMap[cid].totalSpent += amount;
       loyalMap[cid].orderCount++;
     }
 
-    // Top 20 by spend — naam nahi, sirf ID (PII issue avoid karo)
     const result = Object.values(loyalMap)
       .sort((a, b) => b.totalSpent - a.totalSpent)
       .slice(0, 20)
-      .map((c, i) => ({
+      .map(c => ({
         customerId: c.customerId,
-        name: `Loyal Customer #${i + 1}`,
+        name: c.name,
         email: "",
         phone: "",
         totalSpent: c.totalSpent.toFixed(2),
