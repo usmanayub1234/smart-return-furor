@@ -518,41 +518,20 @@ select.form-control option{background:var(--surface2);}
     <div class="page-sub">Last 90 days — Top performers and risky customers</div>
   </div>
 
-  <!-- TOP CUSTOMERS -->
+  <!-- TOP 10 CUSTOMERS -->
   <div class="card" style="margin-bottom:20px;border-color:rgba(255,184,79,.3)">
     <div class="card-head" style="background:linear-gradient(135deg,rgba(255,184,79,.1),rgba(168,85,247,.1))">
-      <div class="card-title" style="font-size:16px">🏆 Top Customers — Last 90 Days</div>
+      <div class="card-title" style="font-size:16px">🏆 Top 10 Customers — Last 90 Days</div>
       <button class="btn btn-outline btn-sm" onclick="loadTopCustomers()">
         <span class="material-symbols-rounded">refresh</span> Refresh
       </button>
     </div>
-    <div class="card-body">
-      <div id="top-customers-list">
-        <div class="empty" style="padding:20px 0"><span class="spinner"></span></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- LOYAL CUSTOMERS -->
-  <div class="card" style="border-color:rgba(0,212,138,.3)">
-    <div class="card-head" style="background:linear-gradient(135deg,rgba(0,212,138,.1),rgba(79,124,255,.1))">
-      <div class="card-title" style="font-size:16px">🎁 Loyal Customers — Gift List (Last 90 Days)</div>
-      <div style="display:flex;gap:8px;align-items:center">
-        <span style="font-size:12px;color:var(--sub)" id="loyal-count"></span>
-        <button class="btn btn-outline btn-sm" onclick="loadLoyalCustomers()">
-          <span class="material-symbols-rounded">refresh</span> Refresh
-        </button>
-      </div>
-    </div>
-    <div class="card-body" style="padding:12px 16px">
-      <div style="font-size:12px;color:var(--sub);margin-bottom:14px">
-        ✅ Customers jinke <strong>saare orders safe/paid</strong> hain — koi void ya cancel nahi. Perfect for gifts & loyalty rewards!
-      </div>
-    </div>
     <div style="overflow-x:auto">
       <table class="data-table">
-        <thead><tr><th>#</th><th>Customer</th><th>Email</th><th>Phone</th><th>Orders (90d)</th><th>Spent (90d)</th><th>Lifetime Spent</th><th>Action</th></tr></thead>
-        <tbody id="loyal-tbody"><tr><td colspan="8"><div class="empty" style="padding:30px 0"><span class="spinner"></span></div></td></tr></tbody>
+        <thead><tr><th>#</th><th>Customer</th><th>Orders (90d)</th><th>Spent (90d)</th></tr></thead>
+        <tbody id="top-customers-list">
+          <tr><td colspan="4"><div class="empty" style="padding:30px 0"><span class="spinner"></span></div></td></tr>
+        </tbody>
       </table>
     </div>
   </div>
@@ -766,7 +745,7 @@ function navTo(page) {
   document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.page === page));
   document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === `page-${page}`));
   if (page === 'analytics') loadAnalytics();
-  if (page === 'customers') { loadRiskyCustomers(); loadTopCustomers(); loadLoyalCustomers(); }
+  if (page === 'customers') { loadRiskyCustomers(); loadTopCustomers(); }
   if (page === 'flagged') {
     if (scanResults.length) {
       renderFlagged(); // re-render existing results
@@ -1196,37 +1175,26 @@ async function loadRiskyCustomers() {
 // ── Top Customers — Diamond 💎 Gold 🥇 Silver 🥈 ──
 async function loadTopCustomers() {
   const el = document.getElementById('top-customers-list');
-  el.innerHTML = '<div class="empty" style="padding:20px 0"><span class="spinner"></span></div>';
+  el.innerHTML = `<tr><td colspan="4"><div class="empty" style="padding:20px 0"><span class="spinner"></span></div></td></tr>`;
   try {
     const top = await api('/api/top-customers');
     if (!top.length) {
-      el.innerHTML = '<p style="color:var(--sub);font-size:13px">No paid orders found in last 90 days.</p>';
+      el.innerHTML = `<tr><td colspan="4"><div class="empty" style="padding:20px 0"><h3>No paid orders in 90 days</h3></div></td></tr>`;
       return;
     }
-    const medals = [
-      { icon: '💎', label: 'Diamond', color: '#a78bfa', bg: 'rgba(167,139,250,.15)', border: 'rgba(167,139,250,.4)' },
-      { icon: '🥇', label: 'Gold',    color: '#fbbf24', bg: 'rgba(251,191,36,.15)',  border: 'rgba(251,191,36,.4)' },
-      { icon: '🥈', label: 'Silver',  color: '#94a3b8', bg: 'rgba(148,163,184,.15)', border: 'rgba(148,163,184,.4)' },
-    ];
-    el.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px">
-      ${top.map((c, i) => {
-        const m = medals[i];
-        return `<div style="background:${m.bg};border:1px solid ${m.border};border-radius:12px;padding:20px;text-align:center">
-          <div style="font-size:40px;margin-bottom:8px">${m.icon}</div>
-          <div style="font-size:11px;font-weight:800;color:${m.color};text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">${m.label} Customer</div>
-          <div style="font-size:15px;font-weight:800;margin-bottom:4px">
-            <a href="https://${window._shop||''}/admin/customers/${c.customerId}" target="_blank"
-               style="color:var(--text);text-decoration:none"
-               onmouseover="this.style.color='${m.color}'" onmouseout="this.style.color='var(--text)'">
-              ${c.name}
-            </a>
-          </div>
-          <div style="font-size:12px;color:var(--sub);margin-bottom:12px">${c.email||''}</div>
-          <div style="font-size:22px;font-weight:900;color:${m.color}">Rs ${parseFloat(c.totalSpent).toLocaleString('en-PK',{maximumFractionDigits:0})}</div>
-          <div style="font-size:12px;color:var(--sub);margin-top:4px">${c.orderCount} orders in 90 days</div>
-        </div>`;
-      }).join('')}
-    </div>`;
+    const medals = ['💎','🥇','🥈','🏅','🏅','🏅','🏅','🏅','🏅','🏅'];
+    el.innerHTML = top.map((c, i) => `<tr>
+      <td><strong style="font-size:18px">${medals[i]||i+1}</strong></td>
+      <td>
+        <a href="https://${window._shop||''}/admin/customers/${c.customerId}" target="_blank"
+           style="color:var(--blue);font-weight:700;text-decoration:none"
+           onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">
+          ${c.name}
+        </a>
+      </td>
+      <td><strong style="color:var(--green)">${c.orderCount}</strong></td>
+      <td><strong style="color:var(--yellow)">Rs ${parseFloat(c.totalSpent).toLocaleString('en-PK',{maximumFractionDigits:0})}</strong></td>
+    </tr>`).join('');
   } catch(e) { toast('Top customers error: ' + e.message, 'error'); }
 }
 

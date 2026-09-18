@@ -851,7 +851,7 @@ app.get("/api/top-customers", async (req, res) => {
     }
     const result = Object.values(customerSpend)
       .sort((a, b) => b.totalSpent - a.totalSpent)
-      .slice(0, 3)
+      .slice(0, 10)
       .map(c => ({
         customerId: c.customerId,
         name: c.name,
