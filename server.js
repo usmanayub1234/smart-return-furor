@@ -827,7 +827,10 @@ app.get("/api/top-customers", async (req, res) => {
         edges { node {
           id
           totalPriceSet { shopMoney { amount } }
-          customer { legacyResourceId }
+          customer {
+            legacyResourceId
+            displayName
+          }
         }}
       }
     }`);
@@ -837,25 +840,27 @@ app.get("/api/top-customers", async (req, res) => {
       const cid = o.customer?.legacyResourceId;
       if (!cid) continue;
       const amount = parseFloat(o.totalPriceSet?.shopMoney?.amount || 0);
-      if (!customerSpend[cid]) customerSpend[cid] = { customerId: cid, totalSpent: 0, orderCount: 0 };
+      if (!customerSpend[cid]) {
+        customerSpend[cid] = {
+          customerId: cid,
+          name: o.customer?.displayName || `Customer ${cid}`,
+          totalSpent: 0,
+          orderCount: 0
+        };
+      }
       customerSpend[cid].totalSpent += amount;
       customerSpend[cid].orderCount++;
     }
-    const top3 = Object.values(customerSpend).sort((a, b) => b.totalSpent - a.totalSpent).slice(0, 3);
-    const result = [];
-    for (const c of top3) {
-      try {
-        const cData = await shopifyRequest("GET", `customers/${c.customerId}.json?fields=id,first_name,last_name,email`);
-        const cu = cData?.customer;
-        if (!cu) {
-          result.push({ customerId: c.customerId, name: `Customer ${c.customerId}`, email: "", totalSpent: c.totalSpent.toFixed(2), orderCount: c.orderCount });
-          continue;
-        }
-        result.push({ customerId: c.customerId, name: `${cu.first_name||""} ${cu.last_name||""}`.trim()||"Unknown", email: cu.email||"", totalSpent: c.totalSpent.toFixed(2), orderCount: c.orderCount });
-      } catch(_) {
-        result.push({ customerId: c.customerId, name: `Customer ${c.customerId}`, email: "", totalSpent: c.totalSpent.toFixed(2), orderCount: c.orderCount });
-      }
-    }
+    const result = Object.values(customerSpend)
+      .sort((a, b) => b.totalSpent - a.totalSpent)
+      .slice(0, 3)
+      .map(c => ({
+        customerId: c.customerId,
+        name: c.name,
+        email: "",
+        totalSpent: c.totalSpent.toFixed(2),
+        orderCount: c.orderCount
+      }));
     res.json(result);
   } catch (e) {
     console.error("Top customers error:", e.message);
