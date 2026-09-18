@@ -827,10 +827,7 @@ app.get("/api/top-customers", async (req, res) => {
         edges { node {
           id
           totalPriceSet { shopMoney { amount } }
-          customer {
-            legacyResourceId
-            displayName
-          }
+          customer { legacyResourceId }
         }}
       }
     }`);
@@ -841,12 +838,7 @@ app.get("/api/top-customers", async (req, res) => {
       if (!cid) continue;
       const amount = parseFloat(o.totalPriceSet?.shopMoney?.amount || 0);
       if (!customerSpend[cid]) {
-        customerSpend[cid] = {
-          customerId: cid,
-          name: o.customer?.displayName || `Customer ${cid}`,
-          totalSpent: 0,
-          orderCount: 0
-        };
+        customerSpend[cid] = { customerId: cid, totalSpent: 0, orderCount: 0 };
       }
       customerSpend[cid].totalSpent += amount;
       customerSpend[cid].orderCount++;
@@ -854,9 +846,9 @@ app.get("/api/top-customers", async (req, res) => {
     const result = Object.values(customerSpend)
       .sort((a, b) => b.totalSpent - a.totalSpent)
       .slice(0, 3)
-      .map(c => ({
+      .map((c, i) => ({
         customerId: c.customerId,
-        name: c.name,
+        name: `Top Customer #${i + 1}`,
         email: "",
         totalSpent: c.totalSpent.toFixed(2),
         orderCount: c.orderCount
@@ -873,31 +865,25 @@ app.get("/api/loyal-customers", async (req, res) => {
   try {
     const since = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
 
-    // Fetch paid orders with customer name directly from GraphQL
+    // Fetch paid orders — sirf amount aur customer ID, koi PII nahi
     const data = await shopifyGQL(`{
       orders(first: 250, query: "created_at:>='${since}' financial_status:paid") {
         edges { node {
-          id name createdAt
+          id
           totalPriceSet { shopMoney { amount } }
-          customer {
-            legacyResourceId
-            displayName
-          }
-          displayFinancialStatus
+          customer { legacyResourceId }
           cancelledAt
         }}
       }
     }`);
 
     if (data.errors) throw new Error(data.errors[0].message);
-
     const paidOrders = data.data.orders.edges.map(e => e.node);
 
-    // Fetch voided/cancelled orders to exclude those customers
+    // Fetch bad orders to exclude those customers
     const badData = await shopifyGQL(`{
       orders(first: 250, query: "created_at:>='${since}'") {
         edges { node {
-          id
           displayFinancialStatus
           cancelledAt
           customer { legacyResourceId }
@@ -907,43 +893,33 @@ app.get("/api/loyal-customers", async (req, res) => {
 
     if (badData.errors) throw new Error(badData.errors[0].message);
 
-    // Find all customer IDs who have ANY bad order
     const badCustomerIds = new Set();
     for (const { node: o } of badData.data.orders.edges) {
       const status = (o.displayFinancialStatus || "").toLowerCase();
       if (status === "voided" || status === "refunded" || !!o.cancelledAt) {
-        if (o.customer?.legacyResourceId) {
-          badCustomerIds.add(o.customer.legacyResourceId);
-        }
+        const cid = o.customer?.legacyResourceId;
+        if (cid) badCustomerIds.add(cid);
       }
     }
 
-    // Group paid orders by customer — exclude anyone with bad history
+    // Group by customer
     const loyalMap = {};
     for (const { node: o } of paidOrders) {
       const cid = o.customer?.legacyResourceId;
       if (!cid || badCustomerIds.has(cid)) continue;
-
       const amount = parseFloat(o.totalPriceSet?.shopMoney?.amount || 0);
-      if (!loyalMap[cid]) {
-        loyalMap[cid] = {
-          customerId: cid,
-          name: o.customer?.displayName || `Customer ${cid}`,
-          totalSpent: 0,
-          orderCount: 0,
-        };
-      }
+      if (!loyalMap[cid]) loyalMap[cid] = { customerId: cid, totalSpent: 0, orderCount: 0 };
       loyalMap[cid].totalSpent += amount;
       loyalMap[cid].orderCount++;
     }
 
-    // Sort by total spent, take top 20
+    // Top 20 by spend — naam nahi, sirf ID (PII issue avoid karo)
     const result = Object.values(loyalMap)
       .sort((a, b) => b.totalSpent - a.totalSpent)
       .slice(0, 20)
-      .map(c => ({
+      .map((c, i) => ({
         customerId: c.customerId,
-        name: c.name,
+        name: `Loyal Customer #${i + 1}`,
         email: "",
         phone: "",
         totalSpent: c.totalSpent.toFixed(2),
