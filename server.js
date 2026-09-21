@@ -162,7 +162,7 @@ app.post("/webhooks/orders/create", express.raw({ type: "*/*" }), async (req, re
   console.log(`🔔 [${orderName}] Webhook fired for customer ${customerId}`);
 
   // ── Step 1: fetch order history — last 180 days ──
-  // 180 days taake purane voided orders bhi count hon
+  // 180 days to include older voided orders
   let history;
   try {
     const since = new Date(Date.now() - 180 * 24 * 60 * 60 * 1000).toISOString();
@@ -186,7 +186,7 @@ app.post("/webhooks/orders/create", express.raw({ type: "*/*" }), async (req, re
   );
 
   // Delivered orders = paid OR (COD = pending + fulfilled)
-  // Pakistan mein COD orders deliver hone ke baad bhi "pending" rehte hain
+  // COD orders stay "pending" even after delivery — count fulfilled+pending as delivered
   const deliveredOrders = history.filter(o =>
     String(o.id) !== String(orderId) &&
     !o.cancelled_at &&
@@ -249,7 +249,7 @@ app.post("/webhooks/orders/create", express.raw({ type: "*/*" }), async (req, re
     const currentOrder = orderData.order;
     const paymentStatus = (currentOrder?.financial_status || "").toLowerCase();
 
-    // Skip tagging if order is already paid — paise aa gaye, risk nahi
+    // Skip tagging if order is already paid — payment received, no risk
     if (paymentStatus === "paid") {
       console.log(`✅ [${orderName}] Step 3 SKIPPED — order already paid, no risk tag needed`);
       return;
@@ -345,7 +345,7 @@ app.post("/api/force-remove-tags", async (req, res) => {
 
       try {
         // If this order is already PAID — remove risk tag immediately
-        // Paid order = paise aa gaye, risk nahi
+        // Paid order = payment received, no risk
         const orderPayStatus = (order.financial_status || "").toLowerCase();
         if (orderPayStatus === "paid") {
           const updatedTags = tags.filter(t =>
@@ -724,7 +724,7 @@ app.post("/api/scan-high-risk", async (req, res) => {
         });
 
         // Also tag all NEW (non-bad, non-paid) orders from this customer
-        // Paid orders skip karo — paise aa gaye, risk nahi
+        // Skip paid orders — payment already received, no risk
         const newOrders = orders.filter(o =>
           o.customer?.legacyResourceId === cid &&
           !c.badOrders.includes(o.name)

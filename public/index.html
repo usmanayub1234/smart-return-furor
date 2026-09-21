@@ -1105,7 +1105,7 @@ async function loadLoyalCustomers() {
     countEl.textContent = customers.length + ' loyal customers found';
 
     if (!customers.length) {
-      tbody.innerHTML = `<tr><td colspan="8"><div class="empty"><span class="empty-icon">🎁</span><h3>Koi loyal customer nahi mila</h3><p>90 din mein koi 100% safe customer nahi</p></div></td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="8"><div class="empty"><span class="empty-icon">🎁</span><h3>No loyal customers found</h3><p>No customers with 100% safe order history in 90 days</p></div></td></tr>`;
       return;
     }
 
@@ -1135,7 +1135,7 @@ async function loadLoyalCustomers() {
   } catch(e) { toast('Loyal customers error: ' + e.message, 'error'); }
 }
 
-// ── Risky Customers — sirf risky dikhao, safe nahi ──
+// ── Risky Customers — show only risky, filter safe ──
 async function loadRiskyCustomers() {
   const tbody = document.getElementById('customers-tbody');
   tbody.innerHTML = `<tr><td colspan="5"><div class="empty" style="padding:40px 0"><span class="spinner"></span></div></td></tr>`;
@@ -1147,7 +1147,7 @@ async function loadRiskyCustomers() {
       return tags.includes('high-risk') || tags.includes('medium-risk');
     });
     if (!risky.length) {
-      tbody.innerHTML = `<tr><td colspan="5"><div class="empty"><span class="empty-icon">✅</span><h3>Koi risky customer nahi!</h3><p>Scan run karo Flagged Orders se</p></div></td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="5"><div class="empty"><span class="empty-icon">✅</span><h3>No risky customers found!</h3><p>Run a scan from Flagged Orders</p></div></td></tr>`;
       return;
     }
     tbody.innerHTML = risky.map(c => {
