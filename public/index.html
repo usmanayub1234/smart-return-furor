@@ -306,10 +306,6 @@ select.form-control option{background:var(--surface2);}
   <div class="nav-item" data-page="analytics">
     <span class="material-symbols-rounded icon">bar_chart</span> Analytics
   </div>
-  <div class="nav-item" data-page="returns">
-    <span class="material-symbols-rounded icon">assignment_return</span> Returns
-  </div>
-
   <div class="sidebar-section">Config</div>
   <div class="nav-item" data-page="rules">
     <span class="material-symbols-rounded icon">tune</span> Risk Rules
@@ -536,18 +532,20 @@ select.form-control option{background:var(--surface2);}
     </div>
   </div>
 
-  <!-- RISK CUSTOMERS -->
-  <div class="card">
-    <div class="card-head">
-      <div class="card-title"><span class="material-symbols-rounded" style="color:var(--red)">person_alert</span> Risky Customers Only</div>
-      <button class="btn btn-outline btn-sm" onclick="loadRiskyCustomers()">
-        <span class="material-symbols-rounded">refresh</span> Refresh
-      </button>
+  <!-- RISK CUSTOMERS removed - visible in Flagged Orders section -->
+
+  <!-- LOYAL CUSTOMERS GIFT LIST -->
+  <div class="card" style="border-color:rgba(52,211,153,.3)">
+    <div class="card-head" style="background:linear-gradient(135deg,rgba(52,211,153,.1),rgba(16,185,129,.05))">
+      <div class="card-title" style="font-size:16px">🎁 Loyal Customers — Gift List</div>
+      <span style="font-size:12px;color:var(--green);font-weight:700" id="loyal-count"></span>
     </div>
     <div style="overflow-x:auto">
       <table class="data-table">
-        <thead><tr><th>Customer</th><th>Orders</th><th>Total Spent</th><th>Tags</th><th>Risk Profile</th></tr></thead>
-        <tbody id="customers-tbody"><tr><td colspan="5"><div class="empty" style="padding:40px 0"><span class="spinner"></span></div></td></tr></tbody>
+        <thead><tr><th>#</th><th>Customer</th><th>Email</th><th>Phone</th><th>Orders (90d)</th><th>Spent (90d)</th><th>Lifetime</th><th>Action</th></tr></thead>
+        <tbody id="loyal-tbody">
+          <tr><td colspan="8"><div class="empty" style="padding:30px 0"><span class="spinner"></span></div></td></tr>
+        </tbody>
       </table>
     </div>
   </div>
@@ -604,24 +602,6 @@ select.form-control option{background:var(--surface2);}
       <div class="card-body" id="a-reasons"><div class="empty" style="padding:20px 0"><span class="spinner"></span></div></div>
     </div>
   </div>
-</div>
-
-<!-- ── RETURNS ── -->
-<div id="page-returns" class="page">
-  <div class="page-header">
-    <div class="page-title">↩️ Create Return</div>
-    <div class="page-sub">Select an order from All Orders to initiate a return</div>
-  </div>
-  <div class="card"><div class="card-body">
-    <div class="empty">
-      <span class="empty-icon">📦</span>
-      <h3>Select an Order</h3>
-      <p>Go to All Orders and click the Return button</p>
-      <button class="btn btn-primary" style="margin-top:20px" onclick="navTo('orders')">
-        <span class="material-symbols-rounded">open_in_new</span> Go to Orders
-      </button>
-    </div>
-  </div></div>
 </div>
 
 <!-- ── RISK RULES ── -->
@@ -745,7 +725,7 @@ function navTo(page) {
   document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.page === page));
   document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === `page-${page}`));
   if (page === 'analytics') loadAnalytics();
-  if (page === 'customers') { loadRiskyCustomers(); loadTopCustomers(); }
+  if (page === 'customers') { loadTopCustomers(); loadLoyalCustomers(); }
   if (page === 'flagged') {
     if (scanResults.length) {
       renderFlagged(); // re-render existing results
@@ -1095,38 +1075,45 @@ function renderFlagged() {
   }).join('');
 }
 
+
 // ── Loyal Customers — Gift List ──
 async function loadLoyalCustomers() {
   const tbody = document.getElementById('loyal-tbody');
   const countEl = document.getElementById('loyal-count');
   tbody.innerHTML = `<tr><td colspan="8"><div class="empty" style="padding:30px 0"><span class="spinner"></span><p style="margin-top:10px;color:var(--sub);font-size:13px">Analyzing 90-day orders...</p></div></td></tr>`;
   try {
-    const customers = await api('/api/loyal-customers');
+    const data = await api('/api/loyal-customers');
+    const customers = Array.isArray(data) ? data : [];
     countEl.textContent = customers.length + ' loyal customers found';
-
     if (!customers.length) {
       tbody.innerHTML = `<tr><td colspan="8"><div class="empty"><span class="empty-icon">🎁</span><h3>No loyal customers found</h3><p>No customers with 100% safe order history in 90 days</p></div></td></tr>`;
       return;
     }
-
     tbody.innerHTML = customers.map((c, i) => {
       const rank = i === 0 ? '💎' : i === 1 ? '🥇' : i === 2 ? '🥈' : `${i+1}.`;
+      const name = (c && c.name) ? c.name : ((c && c.first_name) ? `${c.first_name} ${c.last_name||''}`.trim() : '—');
+      const email = (c && c.email) ? c.email : '—';
+      const phone = (c && c.phone) ? c.phone : '—';
+      const orderCount = (c && c.orderCount) ? c.orderCount : 0;
+      const totalSpent = (c && c.totalSpent) ? parseFloat(c.totalSpent) : 0;
+      const lifetimeSpent = (c && c.lifetimeSpent) ? parseFloat(c.lifetimeSpent) : 0;
+      const customerId = (c && c.customerId) ? c.customerId : (c && c.id ? c.id : '');
       return `<tr>
         <td><strong style="font-size:16px">${rank}</strong></td>
         <td>
-          <a href="https://${window._shop||''}/admin/customers/${c.customerId}" target="_blank"
+          <a href="https://${window._shop||''}/admin/customers/${customerId}" target="_blank"
              style="color:var(--green);font-weight:700;text-decoration:none"
              onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">
-            ${c.name}
+            ${name}
           </a>
         </td>
-        <td style="color:var(--sub);font-size:12px">${c.email||'—'}</td>
-        <td style="color:var(--sub);font-size:12px">${c.phone||'—'}</td>
-        <td><strong style="color:var(--green)">${c.orderCount}</strong></td>
-        <td><strong style="color:var(--green)">Rs ${parseFloat(c.totalSpent).toLocaleString('en-PK',{maximumFractionDigits:0})}</strong></td>
-        <td style="color:var(--sub)">Rs ${parseFloat(c.lifetimeSpent||0).toLocaleString('en-PK',{maximumFractionDigits:0})}</td>
+        <td style="color:var(--sub);font-size:12px">${email}</td>
+        <td style="color:var(--sub);font-size:12px">${phone}</td>
+        <td><strong style="color:var(--green)">${orderCount}</strong></td>
+        <td><strong style="color:var(--green)">Rs ${totalSpent.toLocaleString('en-PK',{maximumFractionDigits:0})}</strong></td>
+        <td style="color:var(--sub)">Rs ${lifetimeSpent.toLocaleString('en-PK',{maximumFractionDigits:0})}</td>
         <td>
-          <a href="mailto:${c.email}" class="btn btn-outline btn-sm" style="text-decoration:none;font-size:11px">
+          <a href="mailto:${email}" class="btn btn-outline btn-sm" style="text-decoration:none;font-size:11px">
             📧 Gift
           </a>
         </td>
