@@ -533,22 +533,6 @@ select.form-control option{background:var(--surface2);}
   </div>
 
   <!-- RISK CUSTOMERS removed - visible in Flagged Orders section -->
-
-  <!-- LOYAL CUSTOMERS GIFT LIST -->
-  <div class="card" style="border-color:rgba(52,211,153,.3)">
-    <div class="card-head" style="background:linear-gradient(135deg,rgba(52,211,153,.1),rgba(16,185,129,.05))">
-      <div class="card-title" style="font-size:16px">🎁 Loyal Customers — Gift List</div>
-      <span style="font-size:12px;color:var(--green);font-weight:700" id="loyal-count"></span>
-    </div>
-    <div style="overflow-x:auto">
-      <table class="data-table">
-        <thead><tr><th>#</th><th>Customer</th><th>Email</th><th>Phone</th><th>Orders (90d)</th><th>Spent (90d)</th><th>Lifetime</th><th>Action</th></tr></thead>
-        <tbody id="loyal-tbody">
-          <tr><td colspan="8"><div class="empty" style="padding:30px 0"><span class="spinner"></span></div></td></tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
 </div>
 
 <!-- ── ALL ORDERS ── -->
@@ -582,24 +566,108 @@ select.form-control option{background:var(--surface2);}
 
 <!-- ── ANALYTICS ── -->
 <div id="page-analytics" class="page">
-  <div class="page-header">
-    <div class="page-title">📈 Analytics</div>
-    <div class="page-sub">90-day return and risk performance metrics</div>
+  <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+    <div>
+      <div class="page-title">📈 Analytics</div>
+      <div class="page-sub">90-day return & risk performance — <span id="a-date-range" style="color:var(--blue);font-weight:600"></span></div>
+    </div>
+    <button class="btn btn-outline btn-sm" onclick="loadAnalytics()">
+      <span class="material-symbols-rounded">refresh</span> Refresh
+    </button>
   </div>
-  <div class="stat-row">
-    <div class="stat-card blue"><div class="stat-icon blue"><span class="material-symbols-rounded">inventory_2</span></div><div class="stat-label">Total Orders</div><div class="stat-value" id="a-orders">—</div></div>
-    <div class="stat-card red"><div class="stat-icon red"><span class="material-symbols-rounded">keyboard_return</span></div><div class="stat-label">Returns Filed</div><div class="stat-value" id="a-returns">—</div></div>
-    <div class="stat-card yellow"><div class="stat-icon yellow"><span class="material-symbols-rounded">trending_up</span></div><div class="stat-label">Return Rate</div><div class="stat-value" id="a-rate">—</div></div>
-    <div class="stat-card green"><div class="stat-icon green"><span class="material-symbols-rounded">payments</span></div><div class="stat-label">$ Refunded</div><div class="stat-value" id="a-amount">—</div></div>
+
+  <!-- KPI CARDS -->
+  <div class="stat-row" style="margin-bottom:20px">
+    <div class="stat-card blue">
+      <div class="stat-icon blue"><span class="material-symbols-rounded">inventory_2</span></div>
+      <div class="stat-label">Total Orders</div>
+      <div class="stat-value" id="a-orders">—</div>
+      <div style="font-size:11px;color:var(--sub);margin-top:4px">Last 90 days</div>
+    </div>
+    <div class="stat-card red">
+      <div class="stat-icon red"><span class="material-symbols-rounded">keyboard_return</span></div>
+      <div class="stat-label">Returns / Refunds</div>
+      <div class="stat-value" id="a-returns">—</div>
+      <div style="font-size:11px;color:var(--sub);margin-top:4px">Refunded orders</div>
+    </div>
+    <div class="stat-card yellow">
+      <div class="stat-icon yellow"><span class="material-symbols-rounded">percent</span></div>
+      <div class="stat-label">Return Rate</div>
+      <div class="stat-value" id="a-rate">—</div>
+      <div style="font-size:11px;color:var(--sub);margin-top:4px" id="a-rate-label">of all orders</div>
+    </div>
+    <div class="stat-card green">
+      <div class="stat-icon green"><span class="material-symbols-rounded">currency_rupee</span></div>
+      <div class="stat-label">Total Refunded</div>
+      <div class="stat-value" style="font-size:20px" id="a-amount">—</div>
+      <div style="font-size:11px;color:var(--sub);margin-top:4px">Revenue lost</div>
+    </div>
   </div>
-  <div class="two-col">
+
+  <!-- RISK BREAKDOWN ROW -->
+  <div class="stat-row" style="margin-bottom:20px">
+    <div class="stat-card" style="border-color:rgba(239,68,68,.3);background:rgba(239,68,68,.05)">
+      <div class="stat-icon red"><span class="material-symbols-rounded">dangerous</span></div>
+      <div class="stat-label">High Risk Customers</div>
+      <div class="stat-value" id="a-high-risk">—</div>
+      <div style="font-size:11px;color:var(--red);margin-top:4px">Flagged by scan</div>
+    </div>
+    <div class="stat-card" style="border-color:rgba(255,184,79,.3);background:rgba(255,184,79,.05)">
+      <div class="stat-icon yellow"><span class="material-symbols-rounded">warning</span></div>
+      <div class="stat-label">Medium Risk Customers</div>
+      <div class="stat-value" id="a-med-risk">—</div>
+      <div style="font-size:11px;color:var(--yellow);margin-top:4px">Watch list</div>
+    </div>
+    <div class="stat-card" style="border-color:rgba(52,211,153,.3);background:rgba(52,211,153,.05)">
+      <div class="stat-icon green"><span class="material-symbols-rounded">verified</span></div>
+      <div class="stat-label">Safe Customers</div>
+      <div class="stat-value" id="a-safe">—</div>
+      <div style="font-size:11px;color:var(--green);margin-top:4px">No issues</div>
+    </div>
+    <div class="stat-card" style="border-color:rgba(99,102,241,.3);background:rgba(99,102,241,.05)">
+      <div class="stat-icon blue"><span class="material-symbols-rounded">block</span></div>
+      <div class="stat-label">Voided Orders</div>
+      <div class="stat-value" id="a-voided">—</div>
+      <div style="font-size:11px;color:var(--sub);margin-top:4px">Cancelled payments</div>
+    </div>
+  </div>
+
+  <!-- CHARTS ROW -->
+  <div class="two-col" style="margin-bottom:20px">
     <div class="card">
-      <div class="card-head"><div class="card-title"><span class="material-symbols-rounded" style="color:var(--red)">inventory</span> Most Returned Products</div></div>
+      <div class="card-head">
+        <div class="card-title"><span class="material-symbols-rounded" style="color:var(--red)">inventory</span> Most Returned Products</div>
+      </div>
       <div class="card-body" id="a-products"><div class="empty" style="padding:20px 0"><span class="spinner"></span></div></div>
     </div>
     <div class="card">
-      <div class="card-head"><div class="card-title"><span class="material-symbols-rounded" style="color:var(--blue)">analytics</span> Return Reasons</div></div>
+      <div class="card-head">
+        <div class="card-title"><span class="material-symbols-rounded" style="color:var(--blue)">analytics</span> Return Reasons</div>
+      </div>
       <div class="card-body" id="a-reasons"><div class="empty" style="padding:20px 0"><span class="spinner"></span></div></div>
+    </div>
+  </div>
+
+  <!-- RETURN RATE HEALTH -->
+  <div class="card">
+    <div class="card-head">
+      <div class="card-title"><span class="material-symbols-rounded" style="color:var(--yellow)">health_metrics</span> Return Rate Health</div>
+    </div>
+    <div class="card-body">
+      <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap">
+        <div style="flex:1;min-width:200px">
+          <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:600;margin-bottom:8px">
+            <span>Your Return Rate</span><span id="a-rate-health">—</span>
+          </div>
+          <div class="prog-wrap" style="height:14px;border-radius:7px">
+            <div id="a-rate-bar" class="prog-fill" style="width:0%;height:14px;border-radius:7px;transition:width 1s ease"></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--sub);margin-top:6px">
+            <span>0% (Excellent)</span><span>15% (Industry Avg)</span><span>30%+ (Critical)</span>
+          </div>
+        </div>
+        <div id="a-health-badge" style="padding:10px 20px;border-radius:10px;font-weight:700;font-size:14px;white-space:nowrap">—</div>
+      </div>
     </div>
   </div>
 </div>
@@ -725,7 +793,7 @@ function navTo(page) {
   document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.page === page));
   document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === `page-${page}`));
   if (page === 'analytics') loadAnalytics();
-  if (page === 'customers') { loadTopCustomers(); loadLoyalCustomers(); }
+  if (page === 'customers') { loadTopCustomers(); }
   if (page === 'flagged') {
     if (scanResults.length) {
       renderFlagged(); // re-render existing results
@@ -827,18 +895,66 @@ function renderDashOrders() {
 async function loadAnalytics() {
   try {
     const d = await api('/api/analytics');
+
+    // Dashboard stats
     document.getElementById('d-total').textContent = d.totalOrders;
     document.getElementById('d-returns').textContent = d.totalRefunds;
     document.getElementById('d-rate').textContent = d.returnRate + '%';
     document.getElementById('d-loss').textContent = fmt(d.refundAmount);
-    document.getElementById('a-orders').textContent = d.totalOrders;
-    document.getElementById('a-returns').textContent = d.totalRefunds;
+    document.getElementById('f-cancelled').textContent = d.totalRefunds;
+
+    // Analytics KPIs
+    document.getElementById('a-orders').textContent = d.totalOrders.toLocaleString();
+    document.getElementById('a-returns').textContent = d.totalRefunds.toLocaleString();
     document.getElementById('a-rate').textContent = d.returnRate + '%';
     document.getElementById('a-amount').textContent = fmt(d.refundAmount);
-    document.getElementById('f-cancelled').textContent = d.totalRefunds;
-    window._lastAnalytics = d; // cache for re-use when scan completes later
+
+    // Date range label
+    const now = new Date();
+    const from = new Date(now - 90*24*60*60*1000);
+    const fmt2 = dt => dt.toLocaleDateString('en-PK',{day:'numeric',month:'short',year:'numeric'});
+    const drEl = document.getElementById('a-date-range');
+    if (drEl) drEl.textContent = `${fmt2(from)} – ${fmt2(now)}`;
+
+    // Risk breakdown from scan results
     const high = scanResults.filter(c=>c.riskLevel==='high-risk').length;
-    const med = scanResults.filter(c=>c.riskLevel==='medium-risk').length;
+    const med  = scanResults.filter(c=>c.riskLevel==='medium-risk').length;
+    const safe = scanResults.filter(c=>!c.riskLevel||c.riskLevel==='safe').length;
+    const voided = allOrders.filter(o=>o.financial_status==='voided').length;
+    const hiEl = document.getElementById('a-high-risk');
+    const mdEl = document.getElementById('a-med-risk');
+    const sfEl = document.getElementById('a-safe');
+    const vdEl = document.getElementById('a-voided');
+    if (hiEl) hiEl.textContent = high;
+    if (mdEl) mdEl.textContent = med;
+    if (sfEl) sfEl.textContent = safe || '—';
+    if (vdEl) vdEl.textContent = voided;
+
+    // Return rate health bar
+    const rate = parseFloat(d.returnRate) || 0;
+    const barEl = document.getElementById('a-rate-bar');
+    const badgeEl = document.getElementById('a-health-badge');
+    const rhEl = document.getElementById('a-rate-health');
+    if (barEl) {
+      const pct = Math.min(rate / 30 * 100, 100);
+      barEl.style.width = pct + '%';
+      if (rate < 5) {
+        barEl.style.background = 'var(--green)';
+        if (badgeEl) { badgeEl.textContent = '✅ Excellent'; badgeEl.style.background='rgba(52,211,153,.15)'; badgeEl.style.color='var(--green)'; }
+      } else if (rate < 15) {
+        barEl.style.background = 'var(--blue)';
+        if (badgeEl) { badgeEl.textContent = '🔵 Good'; badgeEl.style.background='rgba(99,102,241,.15)'; badgeEl.style.color='var(--blue)'; }
+      } else if (rate < 25) {
+        barEl.style.background = 'var(--yellow)';
+        if (badgeEl) { badgeEl.textContent = '⚠️ Watch'; badgeEl.style.background='rgba(255,184,79,.15)'; badgeEl.style.color='var(--yellow)'; }
+      } else {
+        barEl.style.background = 'var(--red)';
+        if (badgeEl) { badgeEl.textContent = '🔴 Critical'; badgeEl.style.background='rgba(239,68,68,.15)'; badgeEl.style.color='var(--red)'; }
+      }
+    }
+    if (rhEl) rhEl.textContent = rate + '%';
+
+    window._lastAnalytics = d;
     updateInsightText(high, med);
     renderReasons('dash-reasons', d.topReasons);
     renderReasons('a-reasons', d.topReasons);
@@ -1075,52 +1191,6 @@ function renderFlagged() {
   }).join('');
 }
 
-
-// ── Loyal Customers — Gift List ──
-async function loadLoyalCustomers() {
-  const tbody = document.getElementById('loyal-tbody');
-  const countEl = document.getElementById('loyal-count');
-  tbody.innerHTML = `<tr><td colspan="8"><div class="empty" style="padding:30px 0"><span class="spinner"></span><p style="margin-top:10px;color:var(--sub);font-size:13px">Analyzing 90-day orders...</p></div></td></tr>`;
-  try {
-    const data = await api('/api/loyal-customers');
-    const customers = Array.isArray(data) ? data : [];
-    countEl.textContent = customers.length + ' loyal customers found';
-    if (!customers.length) {
-      tbody.innerHTML = `<tr><td colspan="8"><div class="empty"><span class="empty-icon">🎁</span><h3>No loyal customers found</h3><p>No customers with 100% safe order history in 90 days</p></div></td></tr>`;
-      return;
-    }
-    tbody.innerHTML = customers.map((c, i) => {
-      const rank = i === 0 ? '💎' : i === 1 ? '🥇' : i === 2 ? '🥈' : `${i+1}.`;
-      const name = (c && c.name) ? c.name : ((c && c.first_name) ? `${c.first_name} ${c.last_name||''}`.trim() : '—');
-      const email = (c && c.email) ? c.email : '—';
-      const phone = (c && c.phone) ? c.phone : '—';
-      const orderCount = (c && c.orderCount) ? c.orderCount : 0;
-      const totalSpent = (c && c.totalSpent) ? parseFloat(c.totalSpent) : 0;
-      const lifetimeSpent = (c && c.lifetimeSpent) ? parseFloat(c.lifetimeSpent) : 0;
-      const customerId = (c && c.customerId) ? c.customerId : (c && c.id ? c.id : '');
-      return `<tr>
-        <td><strong style="font-size:16px">${rank}</strong></td>
-        <td>
-          <a href="https://${window._shop||''}/admin/customers/${customerId}" target="_blank"
-             style="color:var(--green);font-weight:700;text-decoration:none"
-             onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">
-            ${name}
-          </a>
-        </td>
-        <td style="color:var(--sub);font-size:12px">${email}</td>
-        <td style="color:var(--sub);font-size:12px">${phone}</td>
-        <td><strong style="color:var(--green)">${orderCount}</strong></td>
-        <td><strong style="color:var(--green)">Rs ${totalSpent.toLocaleString('en-PK',{maximumFractionDigits:0})}</strong></td>
-        <td style="color:var(--sub)">Rs ${lifetimeSpent.toLocaleString('en-PK',{maximumFractionDigits:0})}</td>
-        <td>
-          <a href="mailto:${email}" class="btn btn-outline btn-sm" style="text-decoration:none;font-size:11px">
-            📧 Gift
-          </a>
-        </td>
-      </tr>`;
-    }).join('');
-  } catch(e) { toast('Loyal customers error: ' + e.message, 'error'); }
-}
 
 // ── Risky Customers — show only risky, filter safe ──
 async function loadRiskyCustomers() {
